@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Suave Droning Portfolio</title>
+<style>
+  :root { --bg:#172145 ; --card:#f8f8f8; --maintext:#e8eaed; --text:black; --muted:#9aa0a6; }
+  *{box-sizing:border-box} body{margin:0px;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{padding:28px 40px 10px;display:flex;align-items:center;gap:12px}
+  header img{height:65px}
+  h1{font-size:20px;margin:20px;color:var(--maintext)}
+  p{color:var(--muted);margin: 6px 20px 0}
+  .grid{display:grid;gap:16px;padding:30px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+  .card{background:var(--card);border-radius:14px;padding:20px;border:1px solid #24272c}
+  .card a{display:block;color:var(--text);text-decoration:none}
+  .card h3{margin:0 0 6px;font-size:16px}
+  .card .meta{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <img src="assets/logo.jpg" alt="Suave Droning">
+  <div>
+    <h1>Suave Droning Portfolio</h1>
+    <p>Interactive, high-resolution orthomosaics. Click a project to view.</p>
+  </div>
+</header>
+
+<section class="grid" id="projects">
+  <div class="card"><a href="yellow-breeches/"><h3>Yellow Breeches Creek</h3><div class="meta">Mechanicsburg, PA • Orthomosaic</div></a></div>
+  <div class="card"><a href="residential-roof/"><h3>Residential Roof Demo</h3><div class="meta">Sample roof mapping</div></a></div>
+</section>
+</body>
+</html>

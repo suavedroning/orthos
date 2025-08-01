@@ -8,35 +8,18 @@
 <style>
   html, body { height: 100%; margin: 0; }
   #map { width: 100%; height: 100%; }
-
-  .panel {
-    position: absolute; top: 12px; left: 12px; z-index: 9999;
-    background: rgba(255,255,255,0.96); border-radius: 10px; padding: 12px 14px;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 340px;
-  }
-  .panel h4 { margin: 0 0 6px 0; font-size: 14px; }
-  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  .panel button {
-    cursor: pointer; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff;
-  }
-
-  .logo {
-    position: absolute; bottom: 12px; left: 12px; z-index: 9999;
-    background: rgba(255,255,255,0.9); border-radius: 8px; padding: 8px 12px;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .logo img { height: 28px; width: auto; display: block; }
-
-  .back {
-    position: absolute; top: 12px; right: 12px; z-index: 9999;
-  }
-  .back a {
-    background: #fff; border: 1px solid #ccc; border-radius: 8px;
-    padding: 8px 10px; text-decoration: none; color: #111; font: 13px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  }
+  .panel { position:absolute; top:12px; left:12px; z-index:9999; background:rgba(255,255,255,0.96);
+    border-radius:10px; padding:12px 14px; font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    box-shadow:0 2px 8px rgba(0,0,0,.15); max-width:340px }
+  .panel h4{margin:0 0 6px; font-size:14px}
+  .row{display:flex; align-items:center; gap:8px; margin-top:8px}
+  .panel button{cursor:pointer; padding:6px 10px; border:1px solid #ccc; border-radius:6px; background:#fff}
+  .logo{position:absolute; bottom:12px; left:12px; z-index:9999; background:rgba(255,255,255,.9);
+    border-radius:8px; padding:8px 12px; font:600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    box-shadow:0 2px 8px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px}
+  .logo img{height:28px}
+  .back{position:absolute; top:12px; right:12px; z-index:9999}
+  .back a{background:#fff; border:1px solid #ccc; border-radius:8px; padding:8px 10px; text-decoration:none; color:#111; font:13px system-ui}
 </style>
 </head>
 <body>
@@ -45,23 +28,15 @@
 <div class="panel">
   <h4>How to use</h4>
   <div>Scroll or pinch to zoom. Drag to pan. Toggle layers below. If you get lost, click Recenter.</div>
-  <div class="row">
-    <input id="toggle-ortho" type="checkbox" checked />
-    <label for="toggle-ortho">Show orthomosaic</label>
-  </div>
-  <div class="row">
-    <input id="toggle-basemap" type="checkbox" />
-    <label for="toggle-basemap">Show base map</label>
-  </div>
-  <div class="row">
-    <button id="recenter">Recenter</button>
-  </div>
+  <div class="row"><input id="toggle-ortho" type="checkbox" checked><label for="toggle-ortho">Show orthomosaic</label></div>
+  <div class="row"><input id="toggle-basemap" type="checkbox"><label for="toggle-basemap">Show base map</label></div>
+  <div class="row"><button id="recenter">Recenter</button></div>
 </div>
 
 <div class="back"><a href="../">← Back to portfolio</a></div>
 
 <div class="logo">
-  <img src="../assets/logo.png" alt="Suave Droning" />
+  <img src="../assets/logo1.svg" alt="Suave Droning" />
   <span>Suave Droning • Orthomosaic</span>
 </div>
 
@@ -69,14 +44,17 @@
 <script>
   const map = L.map('map', { zoomControl: true });
 
-  // Base map off by default
+  // Basemap (starts OFF)
   const basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   });
 
-  // Orthomosaic tiles in this folder
+  // Ortho tiles
   const ortho = L.tileLayer('tiles/{z}/{x}/{y}.png', {
-    minZoom: 0, maxZoom: 22, tms: false, attribution: '&copy; Suave Droning'
+    minZoom: 0,
+    maxZoom: 22,
+    tms: true, // match QTiles setting
+    attribution: '&copy; Suave Droning'
   }).addTo(map);
 
   let detectedBounds = null;
@@ -92,44 +70,47 @@
   }
 
   async function loadBounds() {
-    // Prefer metadata.json with bounds [w, s, e, n]
     try {
-      const r = await fetch('tiles/metadata.json');
+      const r = await fetch('tiles/metadata.json'); // relative path
       if (r.ok) {
         const j = await r.json();
-        if (Array.isArray(j.bounds) && j.bounds.length === 4) {
-          const [w, s, e, n] = j.bounds.map(Number);
+        let b = j.bounds;
+        if (typeof b === 'string') b = b.split(',').map(Number);
+        if (Array.isArray(b) && b.length === 4) {
+          const [w, s, e, n] = b.map(Number);
           fit([[s, w], [n, e]]);
+          if (typeof j.maxZoom === 'number') ortho.options.maxZoom = j.maxZoom;
+          if (typeof j.minZoom === 'number') ortho.options.minZoom = j.minZoom;
           return;
         }
       }
-      throw new Error('no metadata.json bounds');
+      throw new Error('no usable bounds in metadata.json');
     } catch (_) {
-      // Fallback to tilemapresource.xml
       try {
         const txt = await (await fetch('tiles/tilemapresource.xml')).text();
-        const doc = new DOMParser().parseFromString(txt, 'text/xml');
+        const doc = new DOMParser().parseFromString(txt,'text/xml');
         const bb = doc.querySelector('BoundingBox');
         if (!bb) throw 0;
         let minx = parseFloat(bb.getAttribute('minx'));
         let miny = parseFloat(bb.getAttribute('miny'));
         let maxx = parseFloat(bb.getAttribute('maxx'));
         let maxy = parseFloat(bb.getAttribute('maxy'));
-        const inMeters = (Math.abs(minx) > 180 || Math.abs(maxx) > 180 || Math.abs(miny) > 90 || Math.abs(maxy) > 90);
-        let w, s, e, n;
+        const inMeters = (Math.abs(minx)>180 || Math.abs(maxx)>180 || Math.abs(miny)>90 || Math.abs(maxy)>90);
+        let w,s,e,n;
         if (inMeters) {
-          w = mercMetersToDeg(minx, false); e = mercMetersToDeg(maxx, false);
-          s = mercMetersToDeg(miny, true);  n = mercMetersToDeg(maxy, true);
-        } else { w = minx; s = miny; e = maxx; n = maxy; }
-        fit([[s, w], [n, e]]);
-      } catch (_) {
-        map.setView([0, 0], 2);
+          w = mercMetersToDeg(minx,false); e = mercMetersToDeg(maxx,false);
+          s = mercMetersToDeg(miny,true);  n = mercMetersToDeg(maxy,true);
+        } else { w=minx; s=miny; e=maxx; n=maxy; }
+        fit([[s,w],[n,e]]);
+      } catch (e2) {
+        console.error('No metadata found. Falling back to world view.', e2);
+        map.setView([0,0], 2);
       }
     }
   }
   loadBounds();
 
-  // UI
+  // UI toggles
   document.getElementById('toggle-ortho').addEventListener('change', e => {
     if (e.target.checked) { ortho.addTo(map); } else { map.removeLayer(ortho); }
   });

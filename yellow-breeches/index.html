@@ -20,10 +20,10 @@
   .panel button { cursor: pointer; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
 
   .right-panel {
-    position: absolute; top: 12px; right: 12px; z-index: 9999;
-    background: rgba(255,255,255,0.96); border-radius: 10px; padding: 12px 14px;
-    font: 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15); width: 220px;
+    position:absolute;top:12px;right:12px;z-index:9999;
+    background:rgba(255,255,255,.96);border-radius:10px;padding:12px 14px;
+    width:220px;font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
   }
   .right-panel label { display:block; margin-bottom: 6px; }
   .right-panel input[type="range"] { width: 100%; }
@@ -71,106 +71,117 @@
 <script>
   const map = L.map('map', { zoomControl: true });
 
+  // Create panes to control draw order (basemap under ortho always)
+  map.createPane('basemapPane');
+  map.getPane('basemapPane').style.zIndex = 200;
+  map.createPane('orthoPane');
+  map.getPane('orthoPane').style.zIndex = 400;
+
   // Basemap (starts OFF)
   const basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   });
 
-  let ortho = null;           // will be created after we read metadata
-  let detectedBounds = null;  // bounds to recenter to
+  let ortho = null;
+  let detectedBounds = null;
+
+  const TRANSPARENT_1PX =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAt8B7XnTqigAAAAASUVORK5CYII=';
 
   function mercMetersToDeg(m, isLat) {
-    const R = 6378137.0;
-    if (!isLat) return (m / R) * (180 / Math.PI);
-    return (Math.atan(Math.sinh(m / R)) * 180) / Math.PI;
+    const R = 6378137;
+    return isLat ? (Math.atan(Math.sinh(m / R)) * 180) / Math.PI : (m / R) * 180 / Math.PI;
   }
-  function fit(bounds) {
+  function fit(bounds, maxZ) {
     detectedBounds = bounds;
-    map.fitBounds(bounds, { padding: [10, 10] });
+    map.fitBounds(bounds, { padding: [10,10], maxZoom: (maxZ ?? 22) - 1 });
   }
 
-  async function loadBoundsAndInitLayer() {
-    let fmt = 'png';     // default
-    let minZ = 0, maxZ = 22;
-    let tmsFlag = true;  // QTiles often uses TMS
+  async function init() {
+    let fmt = 'png', minZ = 0, maxZ = 22, tmsFlag = true;
+    let boundsLL = null;
 
-    // 1) metadata.json (preferred)
-
+    // Read metadata.json (format/minZoom/maxZoom/bounds)
     try {
-      const r = await fetch('./tiles/metadata.json');
-      if (r.ok) {
-        const j = await r.json();
-        if (typeof j.format === 'string') fmt = j.format.toLowerCase(); // 'jpg' or 'png'
-        if (typeof j.minZoom === 'number') minZ = j.minZoom;
-        if (typeof j.maxZoom === 'number') maxZ = j.maxZoom;
-        let b = j.bounds;
-        if (typeof b === 'string') b = b.split(',').map(Number);
-        if (Array.isArray(b) && b.length === 4 && b.every(n => Number.isFinite(n))) {
-          const [w, s, e, n] = b;
-          fit([[s, w], [n, e]]);
-        } else {
-          throw new Error('metadata.json has no usable bounds');
-        }
+      const r = await fetch('tiles/metadata.json');
+      const j = await r.json();
+      if (typeof j.format === 'string') fmt = j.format.toLowerCase();
+      if (typeof j.minZoom === 'number') minZ = j.minZoom;
+      if (typeof j.maxZoom === 'number') maxZ = j.maxZoom;
+
+      let b = j.bounds;
+      if (typeof b === 'string') b = b.split(',').map(Number);
+      if (Array.isArray(b) && b.length === 4) {
+        const [w, s, e, n] = b.map(Number);
+        boundsLL = L.latLngBounds([s, w], [n, e]);
+        fit(boundsLL, maxZ);
       } else {
-        throw new Error('metadata.json not found');
+        throw new Error('No usable bounds');
       }
-    } catch (e) {
-      // 2) tilemapresource.xml fallback
+    } catch {
+      // Fallback: tilemapresource.xml
       try {
         const txt = await (await fetch('tiles/tilemapresource.xml')).text();
-        const doc = new DOMParser().parseFromString(txt,'text/xml');
+        const doc = new DOMParser().parseFromString(txt, 'text/xml');
         const bb = doc.querySelector('BoundingBox');
-        if (!bb) throw new Error('no BoundingBox');
         let minx = parseFloat(bb.getAttribute('minx'));
         let miny = parseFloat(bb.getAttribute('miny'));
         let maxx = parseFloat(bb.getAttribute('maxx'));
         let maxy = parseFloat(bb.getAttribute('maxy'));
-        const inMeters = (Math.abs(minx)>180 || Math.abs(maxx)>180 || Math.abs(miny)>90 || Math.abs(maxy)>90);
-        let w,s,e,n;
-        if (inMeters) {
-          w = mercMetersToDeg(minx,false); e = mercMetersToDeg(maxx,false);
-          s = mercMetersToDeg(miny,true);  n = mercMetersToDeg(maxy,true);
-        } else { w=minx; s=miny; e=maxx; n=maxy; }
-        fit([[s,w],[n,e]]);
-      } catch (e2) {
-        console.error('No metadata found. Falling back to world view.', e2);
+        const inMeters = Math.abs(minx)>180 || Math.abs(maxx)>180 || Math.abs(miny)>90 || Math.abs(maxy)>90;
+        const w = inMeters ? mercMetersToDeg(minx,false) : minx;
+        const e = inMeters ? mercMetersToDeg(maxx,false) : maxx;
+        const s = inMeters ? mercMetersToDeg(miny,true)  : miny;
+        const n = inMeters ? mercMetersToDeg(maxy,true)  : maxy;
+        boundsLL = L.latLngBounds([s, w], [n, e]);
+        fit(boundsLL, maxZ);
+      } catch {
         map.setView([0,0], 2);
       }
     }
 
-    // Respect the layer's zoom range so it actually renders
+    // Respect layer zooms so tiles actually render
     map.setMinZoom(Math.min(map.getMinZoom(), minZ));
     map.setMaxZoom(Math.max(map.getMaxZoom(), maxZ));
+    if (map.getZoom() < minZ) map.setZoom(minZ);
 
-    // Create the ortho layer now that we know the file extension and zooms
+    // Build URL with correct extension from metadata (jpg or png)
     const url = `tiles/{z}/{x}/{y}.${fmt}`;
+
+    // Create ortho layer with transparent error tiles and fixed z-order
     ortho = L.tileLayer(url, {
+      pane: 'orthoPane',
       minZoom: minZ,
       maxZoom: maxZ,
-      tms: tmsFlag,               // flip to false if your export wasn't TMS
-      attribution: '&copy; Suave Droning',
-      opacity: parseFloat(document.getElementById('opacity').value)
+      maxNativeZoom: maxZ,   // when zooming out, scale instead of fetching non-existent z
+      tms: true,             // flip to false if your export was XYZ
+      opacity: parseFloat(document.getElementById('opacity').value),
+      errorTileUrl: TRANSPARENT_1PX,
+      noWrap: true,
+      bounds: boundsLL       // prevent requests outside footprint (supported in Leaflet 1.9)
     }).addTo(map);
+
+    // Make sure ortho stays above basemap when toggling
+    ortho.bringToFront();
   }
 
-  loadBoundsAndInitLayer();
+  init();
 
-  // UI toggles
+  // UI
   document.getElementById('toggle-ortho').addEventListener('change', e => {
     if (!ortho) return;
-    if (e.target.checked) { ortho.addTo(map); } else { map.removeLayer(ortho); }
+    if (e.target.checked) { ortho.addTo(map); ortho.bringToFront(); }
+    else { map.removeLayer(ortho); }
   });
   document.getElementById('toggle-basemap').addEventListener('change', e => {
-    if (e.target.checked) { basemap.addTo(map); } else { map.removeLayer(basemap); }
+    if (e.target.checked) { basemap.addTo(map); }
+    else { map.removeLayer(basemap); }
   });
   document.getElementById('recenter').addEventListener('click', () => {
-    if (detectedBounds) map.fitBounds(detectedBounds, { padding: [10, 10] });
+    if (detectedBounds) map.fitBounds(detectedBounds, { padding: [10,10] });
   });
-
-  // Opacity slider
   document.getElementById('opacity').addEventListener('input', e => {
     if (ortho) ortho.setOpacity(parseFloat(e.target.value));
   });
 </script>
-</body>
-</html>
+

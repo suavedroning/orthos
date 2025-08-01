@@ -8,18 +8,39 @@
 <style>
   html, body { height: 100%; margin: 0; }
   #map { width: 100%; height: 100%; }
-  .panel { position:absolute; top:12px; left:12px; z-index:9999; background:rgba(255,255,255,0.96);
-    border-radius:10px; padding:12px 14px; font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    box-shadow:0 2px 8px rgba(0,0,0,.15); max-width:340px }
-  .panel h4{margin:0 0 6px; font-size:14px}
-  .row{display:flex; align-items:center; gap:8px; margin-top:8px}
-  .panel button{cursor:pointer; padding:6px 10px; border:1px solid #ccc; border-radius:6px; background:#fff}
-  .logo{position:absolute; bottom:12px; left:12px; z-index:9999; background:rgba(255,255,255,.9);
-    border-radius:8px; padding:8px 12px; font:600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    box-shadow:0 2px 8px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px}
-  .logo img{height:28px}
-  .back{position:absolute; top:12px; right:12px; z-index:9999}
-  .back a{background:#fff; border:1px solid #ccc; border-radius:8px; padding:8px 10px; text-decoration:none; color:#111; font:13px system-ui}
+
+  .panel {
+    position: absolute; top: 12px; left: 12px; z-index: 9999;
+    background: rgba(255,255,255,0.96); border-radius: 10px; padding: 12px 14px;
+    font: 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 340px;
+  }
+  .panel h4 { margin: 0 0 6px 0; font-size: 14px; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .panel button { cursor: pointer; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
+
+  .right-panel {
+    position: absolute; top: 12px; right: 12px; z-index: 9999;
+    background: rgba(255,255,255,0.96); border-radius: 10px; padding: 12px 14px;
+    font: 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); width: 220px;
+  }
+  .right-panel label { display:block; margin-bottom: 6px; }
+  .right-panel input[type="range"] { width: 100%; }
+
+  .logo {
+    position: absolute; bottom: 12px; left: 12px; z-index: 9999;
+    background: rgba(255,255,255,0.9); border-radius: 8px; padding: 8px 12px;
+    font: 600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px;
+  }
+  .logo img { height: 28px }
+
+  .back { position: absolute; top: 12px; right: 12px; z-index: 9999 }
+  .back a { background:#fff; border:1px solid #ccc; border-radius:8px; padding:8px 10px; text-decoration:none; color:#111; font:13px system-ui }
+
+  /* keep back link below opacity card */
+  .back { top: 100px; }
 </style>
 </head>
 <body>
@@ -33,12 +54,18 @@
   <div class="row"><button id="recenter">Recenter</button></div>
 </div>
 
+<div class="right-panel">
+  <label for="opacity">Orthomosaic opacity</label>
+  <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
+</div>
+
 <div class="back"><a href="../">← Back to portfolio</a></div>
 
 <div class="logo">
-  <img src="../assets/logo1.svg" alt="Suave Droning" />
+  <img src="./assets/logo1.svg" alt="Suave Droning" />
   <span>Suave Droning • Orthomosaic</span>
 </div>
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -49,15 +76,8 @@
     attribution: '&copy; OpenStreetMap contributors'
   });
 
-  // Ortho tiles
-  const ortho = L.tileLayer('tiles/{z}/{x}/{y}.png', {
-    minZoom: 0,
-    maxZoom: 22,
-    tms: true, // match QTiles setting
-    attribution: '&copy; Suave Droning'
-  }).addTo(map);
-
-  let detectedBounds = null;
+  let ortho = null;           // will be created after we read metadata
+  let detectedBounds = null;  // bounds to recenter to
 
   function mercMetersToDeg(m, isLat) {
     const R = 6378137.0;
@@ -69,28 +89,38 @@
     map.fitBounds(bounds, { padding: [10, 10] });
   }
 
-  async function loadBounds() {
+  async function loadBoundsAndInitLayer() {
+    let fmt = 'png';     // default
+    let minZ = 0, maxZ = 22;
+    let tmsFlag = true;  // QTiles often uses TMS
+
+    // 1) metadata.json (preferred)
+
     try {
-      const r = await fetch('tiles/metadata.json'); // relative path
+      const r = await fetch('./tiles/metadata.json');
       if (r.ok) {
         const j = await r.json();
+        if (typeof j.format === 'string') fmt = j.format.toLowerCase(); // 'jpg' or 'png'
+        if (typeof j.minZoom === 'number') minZ = j.minZoom;
+        if (typeof j.maxZoom === 'number') maxZ = j.maxZoom;
         let b = j.bounds;
         if (typeof b === 'string') b = b.split(',').map(Number);
-        if (Array.isArray(b) && b.length === 4) {
-          const [w, s, e, n] = b.map(Number);
+        if (Array.isArray(b) && b.length === 4 && b.every(n => Number.isFinite(n))) {
+          const [w, s, e, n] = b;
           fit([[s, w], [n, e]]);
-          if (typeof j.maxZoom === 'number') ortho.options.maxZoom = j.maxZoom;
-          if (typeof j.minZoom === 'number') ortho.options.minZoom = j.minZoom;
-          return;
+        } else {
+          throw new Error('metadata.json has no usable bounds');
         }
+      } else {
+        throw new Error('metadata.json not found');
       }
-      throw new Error('no usable bounds in metadata.json');
-    } catch (_) {
+    } catch (e) {
+      // 2) tilemapresource.xml fallback
       try {
         const txt = await (await fetch('tiles/tilemapresource.xml')).text();
         const doc = new DOMParser().parseFromString(txt,'text/xml');
         const bb = doc.querySelector('BoundingBox');
-        if (!bb) throw 0;
+        if (!bb) throw new Error('no BoundingBox');
         let minx = parseFloat(bb.getAttribute('minx'));
         let miny = parseFloat(bb.getAttribute('miny'));
         let maxx = parseFloat(bb.getAttribute('maxx'));
@@ -107,11 +137,27 @@
         map.setView([0,0], 2);
       }
     }
+
+    // Respect the layer's zoom range so it actually renders
+    map.setMinZoom(Math.min(map.getMinZoom(), minZ));
+    map.setMaxZoom(Math.max(map.getMaxZoom(), maxZ));
+
+    // Create the ortho layer now that we know the file extension and zooms
+    const url = `tiles/{z}/{x}/{y}.${fmt}`;
+    ortho = L.tileLayer(url, {
+      minZoom: minZ,
+      maxZoom: maxZ,
+      tms: tmsFlag,               // flip to false if your export wasn't TMS
+      attribution: '&copy; Suave Droning',
+      opacity: parseFloat(document.getElementById('opacity').value)
+    }).addTo(map);
   }
-  loadBounds();
+
+  loadBoundsAndInitLayer();
 
   // UI toggles
   document.getElementById('toggle-ortho').addEventListener('change', e => {
+    if (!ortho) return;
     if (e.target.checked) { ortho.addTo(map); } else { map.removeLayer(ortho); }
   });
   document.getElementById('toggle-basemap').addEventListener('change', e => {
@@ -119,6 +165,11 @@
   });
   document.getElementById('recenter').addEventListener('click', () => {
     if (detectedBounds) map.fitBounds(detectedBounds, { padding: [10, 10] });
+  });
+
+  // Opacity slider
+  document.getElementById('opacity').addEventListener('input', e => {
+    if (ortho) ortho.setOpacity(parseFloat(e.target.value));
   });
 </script>
 </body>

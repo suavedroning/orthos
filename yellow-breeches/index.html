@@ -145,37 +145,27 @@
       }
 
       if (detectedBounds) {
-        map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
-      }
-      map.setMinZoom(minZ);
-      map.setMaxZoom(maxZ);
-
-      // Use your R2 public URL:
-      const cogUrl = "https://suavedroning.com/output_orthophoto_cog.tif";
-    
-      // Find ColorRenderer no matter where it was attached
-      var ColorRenderer = window.ColorRenderer
-          || (window.L && window.L.LeafletGeotiff && window.L.LeafletGeotiff.ColorRenderer)
-          || (window.GeoTIFF && window.GeoTIFF.ColorRenderer);
-
-      if (!ColorRenderer) {
-        alert("ColorRenderer not found! Is leaflet-geotiff loaded?");
-      }
-
-
-      // use new ColorRenderer() 
-      ortho = L.leafletGeotiff(cogUrl, {
-        pane: 'orthoPane',
-        band: [1,2,3], // or [1] for single-band/thermal
-        renderer: new ColorRenderer(),
-        bounds: detectedBounds,
-        minZoom: minZ,
-        maxZoom: maxZ,
-        opacity: parseFloat(document.getElementById('opacity').value)
-      }).addTo(map);
-
-      ortho.bringToFront();
+      map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
     }
+    map.setMinZoom(minZ);
+    map.setMaxZoom(maxZ);
+
+    // Use your R2 public URL:
+    const cogUrl = "https://suavedroning.com/output_orthophoto_cog.tif";
+
+    // The modern leaflet-geotiff way:
+    ortho = L.leafletGeotiff(cogUrl, {
+      pane: 'orthoPane',
+      band: [1,2,3], // for RGB orthos
+      renderer: 'rgb', // <---- THIS IS ALL YOU NEED NOW
+      bounds: detectedBounds,
+      minZoom: minZ,
+      maxZoom: maxZ,
+      opacity: parseFloat(document.getElementById('opacity').value)
+    }).addTo(map);
+
+    ortho.bringToFront();
+
 
     init();
 

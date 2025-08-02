@@ -150,12 +150,20 @@
       map.setMinZoom(minZ);
       map.setMaxZoom(maxZ);
 
-      // --- YOUR ACTUAL COG FILE HERE ---
       // Use your R2 public URL:
       const cogUrl = "https://suavedroning.com/output_orthophoto_cog.tif";
-      // or, if your file is in a folder: "https://suavedroning.com/yellow-breeches/output_orthophoto_cog.tif"
+    
+      // Find ColorRenderer no matter where it was attached
+      var ColorRenderer = window.ColorRenderer
+          || (window.L && window.L.LeafletGeotiff && window.L.LeafletGeotiff.ColorRenderer)
+          || (window.GeoTIFF && window.GeoTIFF.ColorRenderer);
 
-      // --- CRITICAL: use new ColorRenderer() ---
+      if (!ColorRenderer) {
+        alert("ColorRenderer not found! Is leaflet-geotiff loaded?");
+      }
+
+
+      // use new ColorRenderer() 
       ortho = L.leafletGeotiff(cogUrl, {
         pane: 'orthoPane',
         band: [1,2,3], // or [1] for single-band/thermal

@@ -84,10 +84,8 @@
 
   <!-- Scripts in correct order -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/geotiff/dist/geotiff.bundle.min.js"></script>
-  <!-- changed: load the maintained build + its RGB renderer addon -->
-  <script src="https://cdn.jsdelivr.net/npm/leaflet-geotiff-2/dist/leaflet-geotiff.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet-geotiff-2/dist/leaflet-geotiff-rgb.min.js"></script>
+  <!-- switched to PMTiles (single-file tiles); removed geotiff/leaflet-geotiff -->
+  <script src="https://unpkg.com/pmtiles@4.3.0/dist/index.js"></script>
 
   <script>
     const map = L.map('map', { zoomControl: true });
@@ -153,24 +151,17 @@
       map.setMinZoom(minZ);
       map.setMaxZoom(maxZ);
 
-      // Use your R2 public URL:
-      const cogUrl = "https://suavedroning.com/yellow-breeches-cog.tif";
+      // PMTiles URL (single file on R2). Update if your filename/path differs.
+      const pmtilesUrl = "https://suavedroning.com/yellow-breeches.pmtiles";
 
-    // after
-    const renderer = L.LeafletGeotiff.rgb({ rBand: 0, gBand: 1, bBand: 2 });
+      // Build PMTiles source and Leaflet raster layer
+      const p = new pmtiles.PMTiles(pmtilesUrl);
+      ortho = pmtiles.leafletRasterLayer(p, {
+        pane: 'orthoPane',
+        opacity: parseFloat(document.getElementById('opacity').value) || 1
+      }).addTo(map);
 
-    ortho = L.leafletGeotiff(cogUrl, {
-      pane: 'orthoPane',
-      renderer,                 // use the rgb renderer instance
-      rBand: 0, gBand: 1, bBand: 2, // (some builds read these from options too)
-      bounds: detectedBounds,
-      minZoom: minZ,
-      maxZoom: maxZ,
-      opacity: parseFloat(document.getElementById('opacity').value),
-      noDataValue: 0            // optional: helps avoid odd tiles if you have nodata
-    }).addTo(map);
-
-    ortho.bringToFront();
+      ortho.bringToFront();
     }
 
     init();

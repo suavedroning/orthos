@@ -82,19 +82,17 @@
     <span>Suave Droning • Orthomosaic</span>
   </div>
 
+  <!-- Scripts in correct order -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/geotiff/dist/geotiff.browser.min.js"></script>
   <script src="https://unpkg.com/leaflet-geotiff/dist/leaflet-geotiff.min.js"></script>
   <script>
     const map = L.map('map', { zoomControl: true });
-
-    // Create panes for draw order
     map.createPane('basemapPane');
     map.getPane('basemapPane').style.zIndex = 200;
     map.createPane('orthoPane');
     map.getPane('orthoPane').style.zIndex = 400;
 
-    // Basemap (off by default)
     const basemap = L.tileLayer(
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       { pane: 'basemapPane', attribution: '&copy; OpenStreetMap contributors' }
@@ -102,8 +100,9 @@
 
     let ortho = null;
     let detectedBounds = null;
+    let minZ = 0, maxZ = 22;
 
-    // helper to build bounds if needed
+    // helper for XML fallback
     function mercMetersToDeg(m, isLat) {
       const R = 6378137;
       return isLat
@@ -112,16 +111,12 @@
     }
 
     async function init() {
-      let minZ = 0, maxZ = 22;
-
       // fetch metadata.json
       try {
         const res = await fetch('./tiles/metadata.json');
         const meta = await res.json();
         if (typeof meta.minZoom === 'number') minZ = meta.minZoom;
         if (typeof meta.maxZoom === 'number') maxZ = meta.maxZoom;
-
-        // parse bounds [west,south,east,north]
         let b = typeof meta.bounds === 'string'
           ? meta.bounds.split(',').map(Number)
           : meta.bounds;
@@ -130,7 +125,6 @@
           detectedBounds = L.latLngBounds([s, w], [n, e]);
         } else throw new Error();
       } catch {
-        // fallback to tilemapresource.xml
         try {
           const txt = await (await fetch('tiles/tilemapresource.xml')).text();
           const doc = new DOMParser().parseFromString(txt, 'text/xml');
@@ -146,21 +140,25 @@
           const n = inMeters ? mercMetersToDeg(maxy,true)  : maxy;
           detectedBounds = L.latLngBounds([s, w], [n, e]);
         } catch {
-          // default view
           map.setView([0,0],2);
         }
       }
 
-      // apply bounds and zoom constraints
       if (detectedBounds) {
         map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
       }
       map.setMinZoom(minZ);
       map.setMaxZoom(maxZ);
 
-      ortho = L.leafletGeotiff('https://suavedroning.com/output_orthophoto_cog.tif', {
+      // --- YOUR ACTUAL COG FILE HERE ---
+      // Use your R2 public URL:
+      const cogUrl = "https://suavedroning.com/output_orthophoto_cog.tif";
+      // or, if your file is in a folder: "https://suavedroning.com/yellow-breeches/output_orthophoto_cog.tif"
+
+      // --- CRITICAL: use new ColorRenderer() ---
+      ortho = L.leafletGeotiff(cogUrl, {
         pane: 'orthoPane',
-        band: [1,2,3],
+        band: [1,2,3], // or [1] for single-band/thermal
         renderer: new ColorRenderer(),
         bounds: detectedBounds,
         minZoom: minZ,
@@ -168,16 +166,12 @@
         opacity: parseFloat(document.getElementById('opacity').value)
       }).addTo(map);
 
-
-
-        // add the basemap layer
-        map.addLayer(basemap);
-      }
-
+      ortho.bringToFront();
+    }
 
     init();
 
-    // UI bindings
+    // UI controls
     document.getElementById('toggle-ortho').addEventListener('change', e => {
       if (!ortho) return;
       if (e.target.checked) {
@@ -191,7 +185,6 @@
     document.getElementById('toggle-basemap').addEventListener('change', e => {
       if (e.target.checked) map.addLayer(basemap);
       else map.removeLayer(basemap);
-      // COG pane is higher so no need to re-bring
     });
 
     document.getElementById('recenter').addEventListener('click', () => {

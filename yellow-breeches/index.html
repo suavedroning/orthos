@@ -158,17 +158,16 @@
       map.setMinZoom(minZ);
       map.setMaxZoom(maxZ);
 
-      // build the COG layer
-      ortho = L.leafletGeotiff(
-        'https://drive.google.com/uc?export=download&id=1oeKU8Ctyz5Ty3mKTSXgTuPoLuA2wSCl6', {
-          pane: 'orthoPane',
-          band: [1,2,3],  // RGB
-          renderer: new L.LeafletGeotiff.ColorRenderer(),
-          bounds: detectedBounds,
-          minZoom: minZ,
-          maxZoom: maxZ,
-          opacity: parseFloat(document.getElementById('opacity').value)
+      ortho = L.leafletGeotiff('https://suavedroning.com/output_orthophoto_cog.tif', {
+        pane: 'orthoPane',
+        band: [1,2,3],  // RGB or [1] for single-band
+        renderer: new L.LeafletGeotiff.ColorRenderer(),
+        bounds: detectedBounds,
+        minZoom: minZ,
+        maxZoom: maxZ,
+        opacity: parseFloat(document.getElementById('opacity').value)
       }).addTo(map);
+
 
         // add the basemap layer
         map.addLayer(basemap);

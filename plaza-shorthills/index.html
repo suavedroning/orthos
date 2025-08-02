@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Suave Droning • Plaza at Short Hills Orthomosaic</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { height: 100%; margin: 0 }
+    #map { width:100%; height:100% }
+
+    .panel {
+      position: absolute; top:12px; left:12px; z-index:9999;
+      background: rgba(255,255,255,0.96); border-radius:10px; padding:12px 14px;
+      font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width:340px;
+    }
+    .panel h4 { margin:0 0 6px; font-size:14px }
+    .row { display:flex; align-items:center; gap:8px; margin-top:8px }
+    .panel button {
+      cursor:pointer; padding:6px 10px; border:1px solid #ccc;
+      border-radius:6px; background:#fff;
+    }
+
+    .right-panel {
+      position:absolute; top:12px; right:12px; z-index:9999;
+      background:rgba(255,255,255,0.96); border-radius:10px; padding:12px 14px;
+      width:220px; font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      box-shadow:0 2px 8px rgba(0,0,0,0.15);
+    }
+    .right-panel label { display:block; margin-bottom:6px }
+    .right-panel input[type="range"] { width:100% }
+
+    .logo {
+      position:absolute; bottom:12px; left:12px; z-index:9999;
+      background:rgba(255,255,255,0.9); border-radius:8px; padding:8px 12px;
+      font:600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      box-shadow:0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px;
+    }
+    .logo img { height:28px }
+
+    .back {
+      position:absolute; top:100px; right:12px; z-index:9999;
+    }
+    .back a {
+      background:#fff; border:1px solid #ccc; border-radius:8px;
+      padding:8px 10px; text-decoration:none; color:#111;
+      font:13px system-ui;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="panel">
+    <h4>How to use</h4>
+    <div>Scroll or pinch to zoom. Drag to pan. Toggle layers below. If you get lost, click Recenter.</div>
+    <div class="row">
+      <input id="toggle-ortho" type="checkbox" checked>
+      <label for="toggle-ortho">Show orthomosaic</label>
+    </div>
+    <div class="row">
+      <input id="toggle-basemap" type="checkbox">
+      <label for="toggle-basemap">Show base map</label>
+    </div>
+    <div class="row">
+      <button id="recenter">Recenter</button>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <label for="opacity">Orthomosaic opacity</label>
+    <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
+  </div>
+
+  <div class="back">
+    <a href="../">← Back to portfolio</a>
+  </div>
+
+  <div class="logo">
+    <img src="./assets/logo1.svg" alt="Suave Droning" />
+    <span>Suave Droning • Orthomosaic</span>
+  </div>
+
+  <!-- Scripts in correct order -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- switched to PMTiles (single-file tiles); removed geotiff/leaflet-geotiff -->
+  <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
+
+  <script>
+    const map = L.map('map', { zoomControl: true });
+    map.createPane('basemapPane');
+    map.getPane('basemapPane').style.zIndex = 200;
+    map.createPane('orthoPane');
+    map.getPane('orthoPane').style.zIndex = 400;
+
+    const basemap = L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { pane: 'basemapPane', attribution: '&copy; OpenStreetMap contributors' }
+    );
+
+    let ortho = null;
+    let detectedBounds = null;
+    let minZ = 0, maxZ = 22;
+
+    // helper for XML fallback
+    function mercMetersToDeg(m, isLat) {
+      const R = 6378137;
+      return isLat
+        ? (Math.atan(Math.sinh(m / R)) * 180) / Math.PI
+        : (m / R) * 180 / Math.PI;
+    }
+
+    async function init() {
+      // fetch metadata.json
+      try {
+        const res = await fetch('./tiles/metadata.json');
+        const meta = await res.json();
+        if (typeof meta.minZoom === 'number') minZ = meta.minZoom;
+        if (typeof meta.maxZoom === 'number') maxZ = meta.maxZoom;
+        let b = typeof meta.bounds === 'string'
+          ? meta.bounds.split(',').map(Number)
+          : meta.bounds;
+        if (Array.isArray(b) && b.length === 4) {
+          const [w, s, e, n] = b.map(Number);
+          detectedBounds = L.latLngBounds([s, w], [n, e]);
+        } else throw new Error();
+      } catch {
+        try {
+          const txt = await (await fetch('tiles/tilemapresource.xml')).text();
+          const doc = new DOMParser().parseFromString(txt, 'text/xml');
+          const bb = doc.querySelector('BoundingBox');
+          const minx = +bb.getAttribute('minx'),
+                miny = +bb.getAttribute('miny'),
+                maxx = +bb.getAttribute('maxx'),
+                maxy = +bb.getAttribute('maxy');
+          const inMeters = Math.abs(minx) > 180;
+          const w = inMeters ? mercMetersToDeg(minx,false) : minx;
+          const e = inMeters ? mercMetersToDeg(maxx,false) : maxx;
+          const s = inMeters ? mercMetersToDeg(miny,true)  : miny;
+          const n = inMeters ? mercMetersToDeg(maxy,true)  : maxy;
+          detectedBounds = L.latLngBounds([s, w], [n, e]);
+        } catch {
+          map.setView([0,0],2);
+        }
+      }
+
+      if (detectedBounds) {
+        map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
+      }
+      map.setMinZoom(minZ);
+      map.setMaxZoom(maxZ);
+
+      // PMTiles URL (single file on R2). Update if your filename/path differs.
+      const pmtilesUrl = "https://tiles.suavedroning.com/yellow-breeches.pmtiles";
+
+      // Build PMTiles source and Leaflet raster layer
+      const p = new pmtiles.PMTiles(pmtilesUrl);
+      ortho = pmtiles.leafletRasterLayer(p, {
+        pane: 'orthoPane',
+        opacity: parseFloat(document.getElementById('opacity').value) || 1
+      }).addTo(map);
+
+      ortho.bringToFront();
+    }
+
+    init();
+
+    // UI controls
+    document.getElementById('toggle-ortho').addEventListener('change', e => {
+      if (!ortho) return;
+      if (e.target.checked) {
+        map.addLayer(ortho);
+        ortho.bringToFront();
+      } else {
+        map.removeLayer(ortho);
+      }
+    });
+
+    document.getElementById('toggle-basemap').addEventListener('change', e => {
+      if (e.target.checked) map.addLayer(basemap);
+      else map.removeLayer(basemap);
+    });
+
+    document.getElementById('recenter').addEventListener('click', () => {
+      if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
+    });
+
+    document.getElementById('opacity').addEventListener('input', e => {
+      if (ortho) ortho.setOpacity(parseFloat(e.target.value));
+    });
+  </script>
+</body>
+</html>

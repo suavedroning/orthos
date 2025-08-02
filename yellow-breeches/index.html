@@ -160,13 +160,14 @@
 
       ortho = L.leafletGeotiff('https://suavedroning.com/output_orthophoto_cog.tif', {
         pane: 'orthoPane',
-        band: [1,2,3],  // RGB or [1] for single-band
-        renderer: new L.LeafletGeotiff.ColorRenderer(),
+        band: [1,2,3],
+        renderer: new ColorRenderer(),
         bounds: detectedBounds,
         minZoom: minZ,
         maxZoom: maxZ,
         opacity: parseFloat(document.getElementById('opacity').value)
       }).addTo(map);
+
 
 
         // add the basemap layer

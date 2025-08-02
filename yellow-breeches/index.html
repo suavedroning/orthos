@@ -88,107 +88,110 @@
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
 
   <script>
-    const map = L.map('map', { zoomControl: true });
-    map.createPane('basemapPane');
-    map.getPane('basemapPane').style.zIndex = 200;
-    map.createPane('orthoPane');
-    map.getPane('orthoPane').style.zIndex = 400;
+  const map = L.map('map', { zoomControl: true, worldCopyJump: false });
 
-    const basemap = L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { pane: 'basemapPane', attribution: '&copy; OpenStreetMap contributors' }
-    );
+  map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
+  map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 400;
 
-    let ortho = null;
-    let detectedBounds = null;
-    let minZ = 0, maxZ = 22;
+  // Basemap can over-zoom beyond native; noWrap avoids world copies
+  const basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    pane: 'basemapPane',
+    attribution: '&copy; OpenStreetMap contributors',
+    maxNativeZoom: 19,
+    noWrap: true
+  });
 
-    // helper for XML fallback
-    function mercMetersToDeg(m, isLat) {
-      const R = 6378137;
-      return isLat
-        ? (Math.atan(Math.sinh(m / R)) * 180) / Math.PI
-        : (m / R) * 180 / Math.PI;
+  let ortho = null;
+  let detectedBounds = null;
+
+  async function init() {
+    // Use your file here
+    const pmtilesUrl = "https://tiles.suavedroning.com/yellow-breeches.pmtiles";
+    const p = new pmtiles.PMTiles(pmtilesUrl);
+
+    // Read zooms + bounds directly from PMTiles
+    const header = await p.getHeader().catch(() => null);
+    const meta   = await p.getMetadata().catch(() => null);
+
+    const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
+    const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
+
+    let b = null;
+    if (meta?.bounds) {
+      b = Array.isArray(meta.bounds) ? meta.bounds.map(Number)
+                                     : String(meta.bounds).split(',').map(Number);
+    } else if (
+      Number.isFinite(header?.minLon) && Number.isFinite(header?.minLat) &&
+      Number.isFinite(header?.maxLon) && Number.isFinite(header?.maxLat)
+    ) {
+      b = [header.minLon, header.minLat, header.maxLon, header.maxLat];
     }
 
-    async function init() {
-      // fetch metadata.json
-      try {
-        const res = await fetch('./tiles/metadata.json');
-        const meta = await res.json();
-        if (typeof meta.minZoom === 'number') minZ = meta.minZoom;
-        if (typeof meta.maxZoom === 'number') maxZ = meta.maxZoom;
-        let b = typeof meta.bounds === 'string'
-          ? meta.bounds.split(',').map(Number)
-          : meta.bounds;
-        if (Array.isArray(b) && b.length === 4) {
-          const [w, s, e, n] = b.map(Number);
-          detectedBounds = L.latLngBounds([s, w], [n, e]);
-        } else throw new Error();
-      } catch {
-        try {
-          const txt = await (await fetch('tiles/tilemapresource.xml')).text();
-          const doc = new DOMParser().parseFromString(txt, 'text/xml');
-          const bb = doc.querySelector('BoundingBox');
-          const minx = +bb.getAttribute('minx'),
-                miny = +bb.getAttribute('miny'),
-                maxx = +bb.getAttribute('maxx'),
-                maxy = +bb.getAttribute('maxy');
-          const inMeters = Math.abs(minx) > 180;
-          const w = inMeters ? mercMetersToDeg(minx,false) : minx;
-          const e = inMeters ? mercMetersToDeg(maxx,false) : maxx;
-          const s = inMeters ? mercMetersToDeg(miny,true)  : miny;
-          const n = inMeters ? mercMetersToDeg(maxy,true)  : maxy;
-          detectedBounds = L.latLngBounds([s, w], [n, e]);
-        } catch {
-          map.setView([0,0],2);
-        }
-      }
+    // Add ortho with native zooms; Leaflet will over-zoom beyond maxNative
+    ortho = pmtiles.leafletRasterLayer(p, {
+      pane: 'orthoPane',
+      noWrap: true,
+      opacity: parseFloat(document.getElementById('opacity').value) || 1,
+      minNativeZoom: minNative,
+      maxNativeZoom: maxNative
+    }).addTo(map);
 
-      if (detectedBounds) {
-        map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
-      }
-      map.setMinZoom(minZ);
-      map.setMaxZoom(maxZ);
+    // Optional: show basemap by default off; your toggle will add it if checked
+    // basemap.addTo(map);
 
-      // PMTiles URL (single file on R2). Update if your filename/path differs.
-      const pmtilesUrl = "https://tiles.suavedroning.com/yellow-breeches.pmtiles";
+    // Fit and then set automatic minZoom so you can zoom out sensibly
+    if (b?.length === 4) {
+      const [w,s,e,n] = b;
+      detectedBounds = L.latLngBounds([s,w],[n,e]);
 
-      // Build PMTiles source and Leaflet raster layer
-      const p = new pmtiles.PMTiles(pmtilesUrl);
-      ortho = pmtiles.leafletRasterLayer(p, {
-        pane: 'orthoPane',
-        opacity: parseFloat(document.getElementById('opacity').value) || 1
-      }).addTo(map);
+      map.fitBounds(detectedBounds, { padding: [10,10] });
 
-      ortho.bringToFront();
+      // Compute a comfortable minZoom from the bounds + current map size
+      const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
+      map.setMinZoom(autoMin);
+
+      // Allow deep zoom in (over-zoom above native)
+      map.setMaxZoom(24);
+
+      // If you want to keep users near the site, you can clamp AFTER verifying it draws:
+      // map.setMaxBounds(detectedBounds.pad(0.5));
+    } else {
+      // Fallback view if bounds missing
+      map.setView([40.72, -74.36], 18);
+      map.setMinZoom(0);
+      map.setMaxZoom(24);
     }
 
-    init();
+    // Nicer background behind transparent tiles
+    document.querySelector('.leaflet-container').style.background = '#f7f7f7';
 
-    // UI controls
-    document.getElementById('toggle-ortho').addEventListener('change', e => {
-      if (!ortho) return;
-      if (e.target.checked) {
-        map.addLayer(ortho);
-        ortho.bringToFront();
-      } else {
-        map.removeLayer(ortho);
-      }
-    });
+    // Debug if needed:
+    console.log('header', header);
+    console.log('meta', meta);
+  }
 
-    document.getElementById('toggle-basemap').addEventListener('change', e => {
-      if (e.target.checked) map.addLayer(basemap);
-      else map.removeLayer(basemap);
-    });
+  init();
 
-    document.getElementById('recenter').addEventListener('click', () => {
-      if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
-    });
+  // UI handlers unchanged
+  document.getElementById('toggle-ortho').addEventListener('change', e => {
+    if (!ortho) return;
+    if (e.target.checked) { map.addLayer(ortho); ortho.bringToFront(); }
+    else { map.removeLayer(ortho); }
+  });
 
-    document.getElementById('opacity').addEventListener('input', e => {
-      if (ortho) ortho.setOpacity(parseFloat(e.target.value));
-    });
-  </script>
+  document.getElementById('toggle-basemap').addEventListener('change', e => {
+    if (e.target.checked) map.addLayer(basemap);
+    else map.removeLayer(basemap);
+  });
+
+  document.getElementById('recenter').addEventListener('click', () => {
+    if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
+  });
+
+  document.getElementById('opacity').addEventListener('input', e => {
+    if (ortho) ortho.setOpacity(parseFloat(e.target.value));
+  });
+</script>
+
 </body>
 </html>

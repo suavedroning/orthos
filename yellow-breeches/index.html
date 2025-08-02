@@ -159,7 +159,7 @@
       map.setMaxZoom(maxZ);
 
       // build the COG layer
-      ortho = L.leafletGeotiff('output_orthophoto_cog.tif', {
+      ortho = L.leafletGeotiff('./output_orthophoto_cog.tif', {
         pane: 'orthoPane',
         band: [1,2,3],  // RGB
         renderer: new L.LeafletGeotiff.ColorRenderer(),

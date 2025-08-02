@@ -137,6 +137,9 @@
     const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
     const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
 
+    const maxAllowedZoom = isMobile ? Math.min(maxNative + 1, 22) : 24;
+
+
     let b = null;
     if (meta?.bounds) {
       b = Array.isArray(meta.bounds) ? meta.bounds.map(Number)
@@ -153,19 +156,21 @@
       maxNativeZoom: maxNative
     }).addTo(map);
 
-    // Fit map to bounds, with a safety-net fallback
     if (b?.length === 4 && b.every(Number.isFinite)) {
       const [w,s,e,n] = b;
       detectedBounds = L.latLngBounds([s,w],[n,e]);
       map.fitBounds(detectedBounds, { padding: [10,10] });
       const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
       map.setMinZoom(autoMin);
-      map.setMaxZoom(24);
+      
+      // *** FIX: Use our new smart max zoom level ***
+      map.setMaxZoom(maxAllowedZoom);
     } else {
-      // Fallback view for Yellow Breeches if bounds are missing
-      map.setView([40.21, -76.98], 16);
+      map.setView([40.24, -76.92], 18);
       map.setMinZoom(0);
-      map.setMaxZoom(24);
+      
+      // *** FIX: Use our new smart max zoom level here too ***
+      map.setMaxZoom(maxAllowedZoom);
     }
 
     document.querySelector('.leaflet-container').style.background = '#f7f7f7';

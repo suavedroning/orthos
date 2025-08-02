@@ -88,107 +88,91 @@
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
 
   <script>
-    const map = L.map('map', { zoomControl: true });
-    map.createPane('basemapPane');
-    map.getPane('basemapPane').style.zIndex = 200;
-    map.createPane('orthoPane');
-    map.getPane('orthoPane').style.zIndex = 400;
+  const map = L.map('map', { zoomControl: true, worldCopyJump: false });
+  map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
+  map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 400;
 
-    const basemap = L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { pane: 'basemapPane', attribution: '&copy; OpenStreetMap contributors' }
-    );
+  const basemap = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { pane: 'basemapPane', attribution: '&copy; OpenStreetMap contributors' }
+  );
 
-    let ortho = null;
-    let detectedBounds = null;
+  let ortho = null;
+  let detectedBounds = null;
+
+  async function init() {
+    const pmtilesUrl = "https://tiles.suavedroning.com/plaza-shorthills-final.pmtiles";
+    const p = new pmtiles.PMTiles(pmtilesUrl);
+
+    // Read header/metadata from the PMTiles file
     let minZ = 0, maxZ = 22;
+    try {
+      const header = await p.getHeader();
+      const meta   = await p.getMetadata().catch(() => null);
 
-    // helper for XML fallback
-    function mercMetersToDeg(m, isLat) {
-      const R = 6378137;
-      return isLat
-        ? (Math.atan(Math.sinh(m / R)) * 180) / Math.PI
-        : (m / R) * 180 / Math.PI;
-    }
+      if (Number.isFinite(header.minZoom)) minZ = header.minZoom;
+      if (Number.isFinite(header.maxZoom)) maxZ = header.maxZoom;
 
-    async function init() {
-      // fetch metadata.json
-      try {
-        const res = await fetch('./tiles/metadata.json');
-        const meta = await res.json();
-        if (typeof meta.minZoom === 'number') minZ = meta.minZoom;
-        if (typeof meta.maxZoom === 'number') maxZ = meta.maxZoom;
-        let b = typeof meta.bounds === 'string'
-          ? meta.bounds.split(',').map(Number)
-          : meta.bounds;
-        if (Array.isArray(b) && b.length === 4) {
-          const [w, s, e, n] = b.map(Number);
-          detectedBounds = L.latLngBounds([s, w], [n, e]);
-        } else throw new Error();
-      } catch {
-        try {
-          const txt = await (await fetch('tiles/tilemapresource.xml')).text();
-          const doc = new DOMParser().parseFromString(txt, 'text/xml');
-          const bb = doc.querySelector('BoundingBox');
-          const minx = +bb.getAttribute('minx'),
-                miny = +bb.getAttribute('miny'),
-                maxx = +bb.getAttribute('maxx'),
-                maxy = +bb.getAttribute('maxy');
-          const inMeters = Math.abs(minx) > 180;
-          const w = inMeters ? mercMetersToDeg(minx,false) : minx;
-          const e = inMeters ? mercMetersToDeg(maxx,false) : maxx;
-          const s = inMeters ? mercMetersToDeg(miny,true)  : miny;
-          const n = inMeters ? mercMetersToDeg(maxy,true)  : maxy;
-          detectedBounds = L.latLngBounds([s, w], [n, e]);
-        } catch {
-          map.setView([0,0],2);
-        }
+      // Prefer metadata.bounds if present; else use header min/max lon/lat
+      let boundsArr = null;
+      if (meta && meta.bounds) {
+        boundsArr = Array.isArray(meta.bounds)
+          ? meta.bounds.map(Number)
+          : String(meta.bounds).split(',').map(Number);
+      } else if (
+        Number.isFinite(header.minLon) && Number.isFinite(header.minLat) &&
+        Number.isFinite(header.maxLon) && Number.isFinite(header.maxLat)
+      ) {
+        boundsArr = [header.minLon, header.minLat, header.maxLon, header.maxLat];
       }
 
-      if (detectedBounds) {
-        map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
+      if (boundsArr && boundsArr.length === 4) {
+        const [w, s, e, n] = boundsArr;
+        detectedBounds = L.latLngBounds([s, w], [n, e]);
+        map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: Math.max(minZ, (maxZ ?? 22) - 1) });
+        map.setMaxBounds(detectedBounds.pad(0.25)); // keep users near the ortho
+      } else {
+        // Fallback view if bounds missing
+        map.setView([40.72, -74.36], 16);
       }
+
       map.setMinZoom(minZ);
       map.setMaxZoom(maxZ);
 
-      // PMTiles URL (single file on R2). Update if your filename/path differs.
-      const pmtilesUrl = "https://tiles.suavedroning.com/plaza-shorthills-final.pmtiles";
-
-      // Build PMTiles source and Leaflet raster layer
-      const p = new pmtiles.PMTiles(pmtilesUrl);
-      ortho = pmtiles.leafletRasterLayer(p, {
-        pane: 'orthoPane',
-        opacity: parseFloat(document.getElementById('opacity').value) || 1
-      }).addTo(map);
-
-      ortho.bringToFront();
+    } catch (err) {
+      console.error('PMTiles header/metadata read failed:', err);
+      map.setView([0,0], 2);
     }
 
-    init();
+    // Add the PMTiles raster layer
+    ortho = pmtiles.leafletRasterLayer(p, {
+      pane: 'orthoPane',
+      noWrap: true,
+      opacity: parseFloat(document.getElementById('opacity').value) || 1
+    }).addTo(map);
+    ortho.bringToFront();
 
-    // UI controls
-    document.getElementById('toggle-ortho').addEventListener('change', e => {
-      if (!ortho) return;
-      if (e.target.checked) {
-        map.addLayer(ortho);
-        ortho.bringToFront();
-      } else {
-        map.removeLayer(ortho);
-      }
-    });
+    // Nice background for transparent areas
+    document.querySelector('.leaflet-container').style.background = '#f7f7f7';
+  }
 
-    document.getElementById('toggle-basemap').addEventListener('change', e => {
-      if (e.target.checked) map.addLayer(basemap);
-      else map.removeLayer(basemap);
-    });
+  init();
 
-    document.getElementById('recenter').addEventListener('click', () => {
-      if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
-    });
-
-    document.getElementById('opacity').addEventListener('input', e => {
-      if (ortho) ortho.setOpacity(parseFloat(e.target.value));
-    });
-  </script>
+  // UI controls (unchanged)
+  document.getElementById('toggle-ortho').addEventListener('change', e => {
+    if (!ortho) return;
+    if (e.target.checked) { map.addLayer(ortho); ortho.bringToFront(); }
+    else { map.removeLayer(ortho); }
+  });
+  document.getElementById('toggle-basemap').addEventListener('change', e => {
+    if (e.target.checked) map.addLayer(basemap); else map.removeLayer(basemap);
+  });
+  document.getElementById('recenter').addEventListener('click', () => {
+    if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
+  });
+  document.getElementById('opacity').addEventListener('input', e => {
+    if (ortho) ortho.setOpacity(parseFloat(e.target.value));
+  });
+</script>
 </body>
 </html>

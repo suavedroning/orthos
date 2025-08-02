@@ -1,187 +1,204 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0" />
-<title>Suave Droning • Yellow Breeches Orthomosaic</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  html, body { height: 100%; margin: 0; }
-  #map { width: 100%; height: 100%; }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Suave Droning • Yellow Breeches Orthomosaic</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { height: 100%; margin: 0 }
+    #map { width:100%; height:100% }
 
-  .panel {
-    position: absolute; top: 12px; left: 12px; z-index: 9999;
-    background: rgba(255,255,255,0.96); border-radius: 10px; padding: 12px 14px;
-    font: 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 340px;
-  }
-  .panel h4 { margin: 0 0 6px 0; font-size: 14px; }
-  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  .panel button { cursor: pointer; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
-
-  .right-panel {
-    position:absolute;top:12px;right:12px;z-index:9999;
-    background:rgba(255,255,255,.96);border-radius:10px;padding:12px 14px;
-    width:220px;font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    box-shadow:0 2px 8px rgba(0,0,0,.15);
-  }
-  .right-panel label { display:block; margin-bottom: 6px; }
-  .right-panel input[type="range"] { width: 100%; }
-
-  .logo {
-    position: absolute; bottom: 12px; left: 12px; z-index: 9999;
-    background: rgba(255,255,255,0.9); border-radius: 8px; padding: 8px 12px;
-    font: 600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px;
-  }
-  .logo img { height: 28px }
-
-  .back { position: absolute; top: 12px; right: 12px; z-index: 9999 }
-  .back a { background:#fff; border:1px solid #ccc; border-radius:8px; padding:8px 10px; text-decoration:none; color:#111; font:13px system-ui }
-
-  /* keep back link below opacity card */
-  .back { top: 100px; }
-</style>
-</head>
-<body>
-<div id="map"></div>
-
-<div class="panel">
-  <h4>How to use</h4>
-  <div>Scroll or pinch to zoom. Drag to pan. Toggle layers below. If you get lost, click Recenter.</div>
-  <div class="row"><input id="toggle-ortho" type="checkbox" checked><label for="toggle-ortho">Show orthomosaic</label></div>
-  <div class="row"><input id="toggle-basemap" type="checkbox"><label for="toggle-basemap">Show base map</label></div>
-  <div class="row"><button id="recenter">Recenter</button></div>
-</div>
-
-<div class="right-panel">
-  <label for="opacity">Orthomosaic opacity</label>
-  <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
-</div>
-
-<div class="back"><a href="../">← Back to portfolio</a></div>
-
-<div class="logo">
-  <img src="./assets/logo1.svg" alt="Suave Droning" />
-  <span>Suave Droning • Orthomosaic</span>
-</div>
-
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-  const map = L.map('map', { zoomControl: true });
-
-  // Create panes to control draw order (basemap under ortho always)
-  map.createPane('basemapPane');
-  map.getPane('basemapPane').style.zIndex = 200;
-  map.createPane('orthoPane');
-  map.getPane('orthoPane').style.zIndex = 400;
-
-  // Basemap (starts OFF)
-  const basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  });
-
-  let ortho = null;
-  let detectedBounds = null;
-
-  const TRANSPARENT_1PX =
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAt8B7XnTqigAAAAASUVORK5CYII=';
-
-  function mercMetersToDeg(m, isLat) {
-    const R = 6378137;
-    return isLat ? (Math.atan(Math.sinh(m / R)) * 180) / Math.PI : (m / R) * 180 / Math.PI;
-  }
-  function fit(bounds, maxZ) {
-    detectedBounds = bounds;
-    map.fitBounds(bounds, { padding: [10,10], maxZoom: (maxZ ?? 22) - 1 });
-  }
-
-  async function init() {
-    let fmt = 'png', minZ = 0, maxZ = 22, tmsFlag = true;
-    let boundsLL = null;
-
-    // Read metadata.json (format/minZoom/maxZoom/bounds)
-    try {
-      const r = await fetch('tiles/metadata.json');
-      const j = await r.json();
-      if (typeof j.format === 'string') fmt = j.format.toLowerCase();
-      if (typeof j.minZoom === 'number') minZ = j.minZoom;
-      if (typeof j.maxZoom === 'number') maxZ = j.maxZoom;
-
-      let b = j.bounds;
-      if (typeof b === 'string') b = b.split(',').map(Number);
-      if (Array.isArray(b) && b.length === 4) {
-        const [w, s, e, n] = b.map(Number);
-        boundsLL = L.latLngBounds([s, w], [n, e]);
-        fit(boundsLL, maxZ);
-      } else {
-        throw new Error('No usable bounds');
-      }
-    } catch {
-      // Fallback: tilemapresource.xml
-      try {
-        const txt = await (await fetch('tiles/tilemapresource.xml')).text();
-        const doc = new DOMParser().parseFromString(txt, 'text/xml');
-        const bb = doc.querySelector('BoundingBox');
-        let minx = parseFloat(bb.getAttribute('minx'));
-        let miny = parseFloat(bb.getAttribute('miny'));
-        let maxx = parseFloat(bb.getAttribute('maxx'));
-        let maxy = parseFloat(bb.getAttribute('maxy'));
-        const inMeters = Math.abs(minx)>180 || Math.abs(maxx)>180 || Math.abs(miny)>90 || Math.abs(maxy)>90;
-        const w = inMeters ? mercMetersToDeg(minx,false) : minx;
-        const e = inMeters ? mercMetersToDeg(maxx,false) : maxx;
-        const s = inMeters ? mercMetersToDeg(miny,true)  : miny;
-        const n = inMeters ? mercMetersToDeg(maxy,true)  : maxy;
-        boundsLL = L.latLngBounds([s, w], [n, e]);
-        fit(boundsLL, maxZ);
-      } catch {
-        map.setView([0,0], 2);
-      }
+    .panel {
+      position: absolute; top:12px; left:12px; z-index:9999;
+      background: rgba(255,255,255,0.96); border-radius:10px; padding:12px 14px;
+      font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width:340px;
+    }
+    .panel h4 { margin:0 0 6px; font-size:14px }
+    .row { display:flex; align-items:center; gap:8px; margin-top:8px }
+    .panel button {
+      cursor:pointer; padding:6px 10px; border:1px solid #ccc;
+      border-radius:6px; background:#fff;
     }
 
-    // Respect layer zooms so tiles actually render
-    map.setMinZoom(Math.min(map.getMinZoom(), minZ));
-    map.setMaxZoom(Math.max(map.getMaxZoom(), maxZ));
-    if (map.getZoom() < minZ) map.setZoom(minZ);
+    .right-panel {
+      position:absolute; top:12px; right:12px; z-index:9999;
+      background:rgba(255,255,255,0.96); border-radius:10px; padding:12px 14px;
+      width:220px; font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      box-shadow:0 2px 8px rgba(0,0,0,0.15);
+    }
+    .right-panel label { display:block; margin-bottom:6px }
+    .right-panel input[type="range"] { width:100% }
 
-    // Build URL with correct extension from metadata (jpg or png)
-    const url = `tiles/{z}/{x}/{y}.${fmt}`;
+    .logo {
+      position:absolute; bottom:12px; left:12px; z-index:9999;
+      background:rgba(255,255,255,0.9); border-radius:8px; padding:8px 12px;
+      font:600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      box-shadow:0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px;
+    }
+    .logo img { height:28px }
 
-    // Create ortho layer with transparent error tiles and fixed z-order
-    ortho = L.tileLayer(url, {
-      pane: 'orthoPane',
-      minZoom: minZ,
-      maxZoom: maxZ,
-      maxNativeZoom: maxZ,   // when zooming out, scale instead of fetching non-existent z
-      tms: true,             // flip to false if your export was XYZ
-      opacity: parseFloat(document.getElementById('opacity').value),
-      errorTileUrl: TRANSPARENT_1PX,
-      noWrap: true,
-      bounds: boundsLL       // prevent requests outside footprint (supported in Leaflet 1.9)
-    }).addTo(map);
+    .back {
+      position:absolute; top:100px; right:12px; z-index:9999;
+    }
+    .back a {
+      background:#fff; border:1px solid #ccc; border-radius:8px;
+      padding:8px 10px; text-decoration:none; color:#111;
+      font:13px system-ui;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
 
-    // Make sure ortho stays above basemap when toggling
-    ortho.bringToFront();
-  }
+  <div class="panel">
+    <h4>How to use</h4>
+    <div>Scroll or pinch to zoom. Drag to pan. Toggle layers below. If you get lost, click Recenter.</div>
+    <div class="row">
+      <input id="toggle-ortho" type="checkbox" checked>
+      <label for="toggle-ortho">Show orthomosaic</label>
+    </div>
+    <div class="row">
+      <input id="toggle-basemap" type="checkbox">
+      <label for="toggle-basemap">Show base map</label>
+    </div>
+    <div class="row">
+      <button id="recenter">Recenter</button>
+    </div>
+  </div>
 
-  init();
+  <div class="right-panel">
+    <label for="opacity">Orthomosaic opacity</label>
+    <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
+  </div>
 
-  // UI
-  document.getElementById('toggle-ortho').addEventListener('change', e => {
-    if (!ortho) return;
-    if (e.target.checked) { ortho.addTo(map); ortho.bringToFront(); }
-    else { map.removeLayer(ortho); }
-  });
-  document.getElementById('toggle-basemap').addEventListener('change', e => {
-    if (e.target.checked) { basemap.addTo(map); }
-    else { map.removeLayer(basemap); }
-  });
-  document.getElementById('recenter').addEventListener('click', () => {
-    if (detectedBounds) map.fitBounds(detectedBounds, { padding: [10,10] });
-  });
-  document.getElementById('opacity').addEventListener('input', e => {
-    if (ortho) ortho.setOpacity(parseFloat(e.target.value));
-  });
-</script>
+  <div class="back">
+    <a href="../">← Back to portfolio</a>
+  </div>
 
+  <div class="logo">
+    <img src="./assets/logo1.svg" alt="Suave Droning" />
+    <span>Suave Droning • Orthomosaic</span>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/geotiff/dist/geotiff.browser.min.js"></script>
+  <script src="https://unpkg.com/leaflet-geotiff/dist/leaflet-geotiff.min.js"></script>
+  <script>
+    const map = L.map('map', { zoomControl: true });
+
+    // Create panes for draw order
+    map.createPane('basemapPane');
+    map.getPane('basemapPane').style.zIndex = 200;
+    map.createPane('orthoPane');
+    map.getPane('orthoPane').style.zIndex = 400;
+
+    // Basemap (off by default)
+    const basemap = L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { pane: 'basemapPane', attribution: '&copy; OpenStreetMap contributors' }
+    );
+
+    let ortho = null;
+    let detectedBounds = null;
+
+    // helper to build bounds if needed
+    function mercMetersToDeg(m, isLat) {
+      const R = 6378137;
+      return isLat
+        ? (Math.atan(Math.sinh(m / R)) * 180) / Math.PI
+        : (m / R) * 180 / Math.PI;
+    }
+
+    async function init() {
+      let minZ = 0, maxZ = 22;
+
+      // fetch metadata.json
+      try {
+        const res = await fetch('tiles/metadata.json');
+        const meta = await res.json();
+        if (typeof meta.minZoom === 'number') minZ = meta.minZoom;
+        if (typeof meta.maxZoom === 'number') maxZ = meta.maxZoom;
+
+        // parse bounds [west,south,east,north]
+        let b = typeof meta.bounds === 'string'
+          ? meta.bounds.split(',').map(Number)
+          : meta.bounds;
+        if (Array.isArray(b) && b.length === 4) {
+          const [w, s, e, n] = b.map(Number);
+          detectedBounds = L.latLngBounds([s, w], [n, e]);
+        } else throw new Error();
+      } catch {
+        // fallback to tilemapresource.xml
+        try {
+          const txt = await (await fetch('tiles/tilemapresource.xml')).text();
+          const doc = new DOMParser().parseFromString(txt, 'text/xml');
+          const bb = doc.querySelector('BoundingBox');
+          const minx = +bb.getAttribute('minx'),
+                miny = +bb.getAttribute('miny'),
+                maxx = +bb.getAttribute('maxx'),
+                maxy = +bb.getAttribute('maxy');
+          const inMeters = Math.abs(minx) > 180;
+          const w = inMeters ? mercMetersToDeg(minx,false) : minx;
+          const e = inMeters ? mercMetersToDeg(maxx,false) : maxx;
+          const s = inMeters ? mercMetersToDeg(miny,true)  : miny;
+          const n = inMeters ? mercMetersToDeg(maxy,true)  : maxy;
+          detectedBounds = L.latLngBounds([s, w], [n, e]);
+        } catch {
+          // default view
+          map.setView([0,0],2);
+        }
+      }
+
+      // apply bounds and zoom constraints
+      if (detectedBounds) {
+        map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
+      }
+      map.setMinZoom(minZ);
+      map.setMaxZoom(maxZ);
+
+      // build the COG layer
+      ortho = L.leafletGeotiff('output_orthophoto_cog.tif', {
+        pane: 'orthoPane',
+        band: [1,2,3],  // RGB
+        renderer: new L.LeafletGeotiff.ColorRenderer(),
+        bounds: detectedBounds,
+        minZoom: minZ,
+        maxZoom: maxZ,
+        opacity: parseFloat(document.getElementById('opacity').value)
+      }).addTo(map);
+
+      // ensure it’s always on top
+      ortho.bringToFront();
+    }
+
+    init();
+
+    // UI bindings
+    document.getElementById('toggle-ortho').addEventListener('change', e => {
+      if (!ortho) return;
+      if (e.target.checked) {
+        map.addLayer(ortho);
+        ortho.bringToFront();
+      } else {
+        map.removeLayer(ortho);
+      }
+    });
+
+    document.getElementById('toggle-basemap').addEventListener('change', e => {
+      if (e.target.checked) map.addLayer(basemap);
+      else map.removeLayer(basemap);
+      // COG pane is higher so no need to re-bring
+    });
+
+    document.getElementById('recenter').addEventListener('click', () => {
+      if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
+    });
+
+    document.getElementById('opacity').addEventListener('input', e => {
+      if (ortho) ortho.setOpacity(parseFloat(e.target.value));
+    });
+  </script>
+</body>
+</html>

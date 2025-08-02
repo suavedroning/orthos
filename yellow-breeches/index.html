@@ -85,7 +85,10 @@
   <!-- Scripts in correct order -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/geotiff/dist/geotiff.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet-geotiff@latest/dist/leaflet-geotiff.min.js"></script>
+  <!-- changed: load the maintained build + its RGB renderer addon -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-geotiff-2/dist/leaflet-geotiff.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-geotiff-2/dist/leaflet-geotiff-rgb.min.js"></script>
+
   <script>
     const map = L.map('map', { zoomControl: true });
     map.createPane('basemapPane');
@@ -145,27 +148,28 @@
       }
 
       if (detectedBounds) {
-      map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
-    }
-    map.setMinZoom(minZ);
-    map.setMaxZoom(maxZ);
+        map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
+      }
+      map.setMinZoom(minZ);
+      map.setMaxZoom(maxZ);
 
-    // Use your R2 public URL:
-    const cogUrl = "https://suavedroning.com/output_orthophoto_cog.tif";
+      // Use your R2 public URL:
+      const cogUrl = "https://suavedroning.com/output_orthophoto_cog.tif";
 
-    // The modern leaflet-geotiff way:
-    ortho = L.leafletGeotiff(cogUrl, {
-      pane: 'orthoPane',
-      band: [1,2,3], // for RGB orthos
-      renderer: 'rgb', // <---- THIS IS ALL YOU NEED NOW
-      bounds: detectedBounds,
-      minZoom: minZ,
-      maxZoom: maxZ,
-      opacity: parseFloat(document.getElementById('opacity').value)
-    }).addTo(map);
+      // Build an RGB renderer from the addon and pass it in
+      const renderer = L.LeafletGeotiff.rgb();
 
-    ortho.bringToFront();
+      ortho = L.leafletGeotiff(cogUrl, {
+        pane: 'orthoPane',
+        band: [1,2,3], // for RGB orthos
+        renderer: renderer,
+        bounds: detectedBounds,
+        minZoom: minZ,
+        maxZoom: maxZ,
+        opacity: parseFloat(document.getElementById('opacity').value)
+      }).addTo(map);
 
+      ortho.bringToFront();
     }
 
     init();
@@ -196,4 +200,3 @@
   </script>
 </body>
 </html>
-

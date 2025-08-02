@@ -83,9 +83,7 @@
     <span>Suave Droning • Orthomosaic</span>
   </div>
 
-  <!-- Scripts in correct order -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- switched to PMTiles (single-file tiles); removed geotiff/leaflet-geotiff -->
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
 
   <script>
@@ -94,31 +92,35 @@
   map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
   map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 400;
 
-  // Basemap can over-zoom beyond native; noWrap avoids world copies
   const basemap = L.tileLayer(
-  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  {
-    pane: 'basemapPane',
-    attribution: '&copy; OpenStreetMap contributors',
-    subdomains: 'abc',
-    noWrap: true,
-    maxNativeZoom: 19,
-    maxZoom: 24,
-    crossOrigin: true
-  }
-).addTo(map);
-
-document.getElementById('toggle-basemap').checked = true;
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+      pane: 'basemapPane',
+      attribution: '&copy; OpenStreetMap contributors',
+      subdomains: 'abc',
+      noWrap: true,
+      maxNativeZoom: 19,
+      maxZoom: 24,
+      crossOrigin: true
+    }
+  ).addTo(map);
 
   let ortho = null;
   let detectedBounds = null;
 
   async function init() {
-    // Use your file here
-    const pmtilesUrl = "https://tiles.suavedroning.com/camp-hill-church.pmtiles";
+    // *** CORRECTED MOBILE LOGIC ***
+    // Detect if the user is on a mobile device.
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+    // Pick the right PMTiles file for the device to prevent crashes.
+    const pmtilesUrl = isMobile
+      ? "https://tiles.suavedroning.com/church-thermal-lite.pmtiles"
+      : "https://tiles.suavedroning.com/camp-hill-church.pmtiles";
+
     const p = new pmtiles.PMTiles(pmtilesUrl);
 
-    // Read zooms + bounds directly from PMTiles
+    // Read zooms + bounds directly from PMTiles (Robust Method)
     const header = await p.getHeader().catch(() => null);
     const meta   = await p.getMetadata().catch(() => null);
 
@@ -129,14 +131,10 @@ document.getElementById('toggle-basemap').checked = true;
     if (meta?.bounds) {
       b = Array.isArray(meta.bounds) ? meta.bounds.map(Number)
                                      : String(meta.bounds).split(',').map(Number);
-    } else if (
-      Number.isFinite(header?.minLon) && Number.isFinite(header?.minLat) &&
-      Number.isFinite(header?.maxLon) && Number.isFinite(header?.maxLat)
-    ) {
+    } else if (header && Number.isFinite(header.minLon)) {
       b = [header.minLon, header.minLat, header.maxLon, header.maxLat];
     }
 
-    // Add ortho with native zooms; Leaflet will over-zoom beyond maxNative
     ortho = pmtiles.leafletRasterLayer(p, {
       pane: 'orthoPane',
       noWrap: true,
@@ -145,60 +143,43 @@ document.getElementById('toggle-basemap').checked = true;
       maxNativeZoom: maxNative
     }).addTo(map);
 
-
-    // Fit and then set automatic minZoom so you can zoom out sensibly
-    if (b?.length === 4) {
+    // Fit map to bounds, with a safety-net fallback
+    if (b?.length === 4 && b.every(Number.isFinite)) {
       const [w,s,e,n] = b;
       detectedBounds = L.latLngBounds([s,w],[n,e]);
-
       map.fitBounds(detectedBounds, { padding: [10,10] });
-
-      // Compute a comfortable minZoom from the bounds + current map size
       const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
       map.setMinZoom(autoMin);
-
-      // Allow deep zoom in (over-zoom above native)
-      map.setMaxZoom(22);
-
-      // If you want to keep users near the site, you can clamp AFTER verifying it draws:
-      // map.setMaxBounds(detectedBounds.pad(0.5));
+      map.setMaxZoom(24);
     } else {
-      // Fallback view if bounds missing
-      map.setView([40.72, -74.36], 18);
+      // Fallback view for Yellow Breeches if bounds are missing
+      map.setView([40.21, -76.98], 16);
       map.setMinZoom(0);
       map.setMaxZoom(24);
     }
 
-    // Nicer background behind transparent tiles
     document.querySelector('.leaflet-container').style.background = '#f7f7f7';
-
-    // Debug if needed:
-    console.log('header', header);
-    console.log('meta', meta);
   }
 
   init();
 
-  // UI handlers unchanged
+  // UI handlers
   document.getElementById('toggle-ortho').addEventListener('change', e => {
     if (!ortho) return;
     if (e.target.checked) { map.addLayer(ortho); ortho.bringToFront(); }
     else { map.removeLayer(ortho); }
   });
-
   document.getElementById('toggle-basemap').addEventListener('change', e => {
     if (e.target.checked) map.addLayer(basemap);
     else map.removeLayer(basemap);
   });
-
   document.getElementById('recenter').addEventListener('click', () => {
     if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
   });
-
   document.getElementById('opacity').addEventListener('input', e => {
     if (ortho) ortho.setOpacity(parseFloat(e.target.value));
   });
-</script>
+  </script>
 
 </body>
 </html>

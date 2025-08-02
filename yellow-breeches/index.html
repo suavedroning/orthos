@@ -156,20 +156,21 @@
       // Use your R2 public URL:
       const cogUrl = "https://suavedroning.com/yellow-breeches-cog.tif";
 
-      // Build an RGB renderer from the addon and pass it in
-      const renderer = L.LeafletGeotiff.rgb();
+    // after
+    const renderer = L.LeafletGeotiff.rgb({ rBand: 0, gBand: 1, bBand: 2 });
 
-      ortho = L.leafletGeotiff(cogUrl, {
-        pane: 'orthoPane',
-        band: [1,2,3], // for RGB orthos
-        renderer: renderer,
-        bounds: detectedBounds,
-        minZoom: minZ,
-        maxZoom: maxZ,
-        opacity: parseFloat(document.getElementById('opacity').value)
-      }).addTo(map);
+    ortho = L.leafletGeotiff(cogUrl, {
+      pane: 'orthoPane',
+      renderer,                 // use the rgb renderer instance
+      rBand: 0, gBand: 1, bBand: 2, // (some builds read these from options too)
+      bounds: detectedBounds,
+      minZoom: minZ,
+      maxZoom: maxZ,
+      opacity: parseFloat(document.getElementById('opacity').value),
+      noDataValue: 0            // optional: helps avoid odd tiles if you have nodata
+    }).addTo(map);
 
-      ortho.bringToFront();
+    ortho.bringToFront();
     }
 
     init();

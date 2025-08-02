@@ -89,96 +89,105 @@
 
   <script>
   const map = L.map('map', { zoomControl: true, worldCopyJump: false });
+
   map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
   map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 400;
 
-  // Allow deep zooming; basemap will overzoom beyond its native max
+  // Basemap can over-zoom beyond native; noWrap avoids world copies
   const basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     pane: 'basemapPane',
     attribution: '&copy; OpenStreetMap contributors',
     maxNativeZoom: 19,
     noWrap: true
-  }).addTo(map);
+  });
 
   let ortho = null;
   let detectedBounds = null;
 
   async function init() {
+    // Use your file here
     const pmtilesUrl = "https://tiles.suavedroning.com/plaza-shorthills-final.pmtiles";
     const p = new pmtiles.PMTiles(pmtilesUrl);
 
-    let minZ = 0, maxZ = 22;
-
-    // Read PMTiles header/metadata
-    const header = await p.getHeader().catch(err => (console.warn('header err', err), null));
+    // Read zooms + bounds directly from PMTiles
+    const header = await p.getHeader().catch(() => null);
     const meta   = await p.getMetadata().catch(() => null);
 
-    if (header) {
-      if (Number.isFinite(header.minZoom)) minZ = header.minZoom;
-      if (Number.isFinite(header.maxZoom)) maxZ = header.maxZoom;
-    }
+    const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
+    const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
 
-    // Compute bounds from metadata.bounds or header min/max lon/lat
-    let boundsArr = null;
-    if (meta && meta.bounds) {
-      boundsArr = Array.isArray(meta.bounds)
-        ? meta.bounds.map(Number)
-        : String(meta.bounds).split(',').map(Number);
+    let b = null;
+    if (meta?.bounds) {
+      b = Array.isArray(meta.bounds) ? meta.bounds.map(Number)
+                                     : String(meta.bounds).split(',').map(Number);
     } else if (
       Number.isFinite(header?.minLon) && Number.isFinite(header?.minLat) &&
       Number.isFinite(header?.maxLon) && Number.isFinite(header?.maxLat)
     ) {
-      boundsArr = [header.minLon, header.minLat, header.maxLon, header.maxLat];
+      b = [header.minLon, header.minLat, header.maxLon, header.maxLat];
     }
 
-    // IMPORTANT: allow zooming beyond native
-    map.setMinZoom(0);          // let the user zoom out as needed
-    map.setMaxZoom(24);         // let the user zoom in further than the tiles’ native max
-
-    // Add the PMTiles raster layer with native zooms so Leaflet overzooms smoothly
+    // Add ortho with native zooms; Leaflet will over-zoom beyond maxNative
     ortho = pmtiles.leafletRasterLayer(p, {
       pane: 'orthoPane',
       noWrap: true,
       opacity: parseFloat(document.getElementById('opacity').value) || 1,
-      minNativeZoom: minZ,
-      maxNativeZoom: maxZ
+      minNativeZoom: minNative,
+      maxNativeZoom: maxNative
     }).addTo(map);
-    ortho.bringToFront();
 
-    // Fit to the ortho WITHOUT passing a maxZoom override (that was capping you)
-    if (boundsArr?.length === 4) {
-      const [w, s, e, n] = boundsArr;
-      detectedBounds = L.latLngBounds([s, w], [n, e]);
-      map.fitBounds(detectedBounds, { padding: [10, 10] });
-      // If you want to clamp later, do it after you confirm it’s drawing:
-      // map.setMaxBounds(detectedBounds.pad(0.25));
+    // Optional: show basemap by default off; your toggle will add it if checked
+    // basemap.addTo(map);
+
+    // Fit and then set automatic minZoom so you can zoom out sensibly
+    if (b?.length === 4) {
+      const [w,s,e,n] = b;
+      detectedBounds = L.latLngBounds([s,w],[n,e]);
+
+      map.fitBounds(detectedBounds, { padding: [10,10] });
+
+      // Compute a comfortable minZoom from the bounds + current map size
+      const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
+      map.setMinZoom(autoMin);
+
+      // Allow deep zoom in (over-zoom above native)
+      map.setMaxZoom(24);
+
+      // If you want to keep users near the site, you can clamp AFTER verifying it draws:
+      // map.setMaxBounds(detectedBounds.pad(0.5));
     } else {
-      // Fallback view near Short Hills if bounds missing
+      // Fallback view if bounds missing
       map.setView([40.72, -74.36], 18);
+      map.setMinZoom(0);
+      map.setMaxZoom(24);
     }
 
-    // Nicer background for transparent tiles
+    // Nicer background behind transparent tiles
     document.querySelector('.leaflet-container').style.background = '#f7f7f7';
 
-    // Debug: see what the file reports
-    console.log('PMTiles header:', header);
-    console.log('PMTiles metadata:', meta);
+    // Debug if needed:
+    console.log('header', header);
+    console.log('meta', meta);
   }
 
   init();
 
-  // UI controls (keep as-is)
+  // UI handlers unchanged
   document.getElementById('toggle-ortho').addEventListener('change', e => {
     if (!ortho) return;
     if (e.target.checked) { map.addLayer(ortho); ortho.bringToFront(); }
     else { map.removeLayer(ortho); }
   });
+
   document.getElementById('toggle-basemap').addEventListener('change', e => {
-    if (e.target.checked) map.addLayer(basemap); else map.removeLayer(basemap);
+    if (e.target.checked) map.addLayer(basemap);
+    else map.removeLayer(basemap);
   });
+
   document.getElementById('recenter').addEventListener('click', () => {
-    if (detectedBounds) map.fitBounds(detectedBounds, { padding: [10, 10] });
+    if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
   });
+
   document.getElementById('opacity').addEventListener('input', e => {
     if (ortho) ortho.setOpacity(parseFloat(e.target.value));
   });

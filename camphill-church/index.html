@@ -94,12 +94,20 @@
   map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 400;
 
   // Basemap can over-zoom beyond native; noWrap avoids world copies
-  const basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  const basemap = L.tileLayer(
+  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {
     pane: 'basemapPane',
     attribution: '&copy; OpenStreetMap contributors',
+    subdomains: 'abc',
+    noWrap: true,
     maxNativeZoom: 19,
-    noWrap: true
-  });
+    maxZoom: 24,
+    crossOrigin: true
+  }
+).addTo(map);
+
+document.getElementById('toggle-basemap').checked = true;
 
   let ortho = null;
   let detectedBounds = null;
@@ -136,8 +144,6 @@
       maxNativeZoom: maxNative
     }).addTo(map);
 
-    // Optional: show basemap by default off; your toggle will add it if checked
-    // basemap.addTo(map);
 
     // Fit and then set automatic minZoom so you can zoom out sensibly
     if (b?.length === 4) {
@@ -151,7 +157,7 @@
       map.setMinZoom(autoMin);
 
       // Allow deep zoom in (over-zoom above native)
-      map.setMaxZoom(24);
+      map.setMaxZoom(22);
 
       // If you want to keep users near the site, you can clamp AFTER verifying it draws:
       // map.setMaxBounds(detectedBounds.pad(0.5));

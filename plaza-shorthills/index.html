@@ -73,7 +73,7 @@
     <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
   </div>
 
-  <div class.back">
+  <div class="back">
     <a href="../">← Back to portfolio</a>
   </div>
 
@@ -82,7 +82,9 @@
     <span>Suave Droning • Orthomosaic</span>
   </div>
 
+  <!-- Scripts in correct order -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- switched to PMTiles (single-file tiles); removed geotiff/leaflet-geotiff -->
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
 
   <script>
@@ -98,42 +100,62 @@
     );
 
     let ortho = null;
+    let detectedBounds = null;
+    let minZ = 0, maxZ = 22;
+
+    // helper for XML fallback
+    function mercMetersToDeg(m, isLat) {
+      const R = 6378137;
+      return isLat
+        ? (Math.atan(Math.sinh(m / R)) * 180) / Math.PI
+        : (m / R) * 180 / Math.PI;
+    }
 
     async function init() {
-      // PMTiles URL (single file on R2).
+      // fetch metadata.json
+      try {
+        const res = await fetch('./metadata.json');
+        const meta = await res.json();
+        if (typeof meta.minZoom === 'number') minZ = meta.minZoom;
+        if (typeof meta.maxZoom === 'number') maxZ = meta.maxZoom;
+        let b = typeof meta.bounds === 'string'
+          ? meta.bounds.split(',').map(Number)
+          : meta.bounds;
+        if (Array.isArray(b) && b.length === 4) {
+          const [w, s, e, n] = b.map(Number);
+          detectedBounds = L.latLngBounds([s, w], [n, e]);
+        } else throw new Error();
+      } catch {
+        try {
+          const txt = await (await fetch('tiles/tilemapresource.xml')).text();
+          const doc = new DOMParser().parseFromString(txt, 'text/xml');
+          const bb = doc.querySelector('BoundingBox');
+          const minx = +bb.getAttribute('minx'),
+                miny = +bb.getAttribute('miny'),
+                maxx = +bb.getAttribute('maxx'),
+                maxy = +bb.getAttribute('maxy');
+          const inMeters = Math.abs(minx) > 180;
+          const w = inMeters ? mercMetersToDeg(minx,false) : minx;
+          const e = inMeters ? mercMetersToDeg(maxx,false) : maxx;
+          const s = inMeters ? mercMetersToDeg(miny,true)  : miny;
+          const n = inMeters ? mercMetersToDeg(maxy,true)  : maxy;
+          detectedBounds = L.latLngBounds([s, w], [n, e]);
+        } catch {
+          map.setView([0,0],2);
+        }
+      }
+
+      if (detectedBounds) {
+        map.fitBounds(detectedBounds, { padding:[10,10], maxZoom: maxZ - 1 });
+      }
+      map.setMinZoom(minZ);
+      map.setMaxZoom(maxZ);
+
+      // PMTiles URL (single file on R2). Update if your filename/path differs.
       const pmtilesUrl = "https://tiles.suavedroning.com/plaza-shorthills-final.pmtiles";
 
       // Build PMTiles source and Leaflet raster layer
       const p = new pmtiles.PMTiles(pmtilesUrl);
-
-      // --- SIMPLIFIED METADATA HANDLING ---
-      // The PMTiles library fetches metadata directly from the .pmtiles file.
-      try {
-        const meta = await p.getMetadata();
-        
-        // Get bounds and zoom levels from the metadata
-        const [w, s, e, n] = meta.bounds;
-        const detectedBounds = L.latLngBounds([s, w], [n, e]);
-        const minZ = meta.minZoom;
-        const maxZ = meta.maxZoom;
-
-        // Set the map view
-        map.fitBounds(detectedBounds, { padding: [10, 10], maxZoom: maxZ - 1 });
-        map.setMinZoom(minZ);
-        map.setMaxZoom(maxZ);
-
-        document.getElementById('recenter').addEventListener('click', () => {
-          map.fitBounds(detectedBounds, { padding:[10,10] });
-        });
-
-      } catch (e) {
-        console.error("Could not fetch PMTiles metadata:", e);
-        map.setView([0,0], 2); // Fallback view
-      }
-      
-
-
-      // Create the Leaflet layer and add it to the map
       ortho = pmtiles.leafletRasterLayer(p, {
         pane: 'orthoPane',
         opacity: parseFloat(document.getElementById('opacity').value) || 1
@@ -158,6 +180,10 @@
     document.getElementById('toggle-basemap').addEventListener('change', e => {
       if (e.target.checked) map.addLayer(basemap);
       else map.removeLayer(basemap);
+    });
+
+    document.getElementById('recenter').addEventListener('click', () => {
+      if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] });
     });
 
     document.getElementById('opacity').addEventListener('input', e => {

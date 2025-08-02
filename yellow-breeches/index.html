@@ -159,19 +159,21 @@
       map.setMaxZoom(maxZ);
 
       // build the COG layer
-      ortho = L.leafletGeotiff('./output_orthophoto_cog.tif', {
-        pane: 'orthoPane',
-        band: [1,2,3],  // RGB
-        renderer: new L.LeafletGeotiff.ColorRenderer(),
-        bounds: detectedBounds,
-        minZoom: minZ,
-        maxZoom: maxZ,
-        opacity: parseFloat(document.getElementById('opacity').value)
+      ortho = L.leafletGeotiff(
+        'https://drive.google.com/uc?export=download&id=1oeKU8Ctyz5Ty3mKTSXgTuPoLuA2wSCl6', {
+          pane: 'orthoPane',
+          band: [1,2,3],  // RGB
+          renderer: new L.LeafletGeotiff.ColorRenderer(),
+          bounds: detectedBounds,
+          minZoom: minZ,
+          maxZoom: maxZ,
+          opacity: parseFloat(document.getElementById('opacity').value)
       }).addTo(map);
 
-      // ensure it’s always on top
-      ortho.bringToFront();
-    }
+        // add the basemap layer
+        map.addLayer(basemap);
+      }
+
 
     init();
 

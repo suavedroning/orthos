@@ -95,17 +95,26 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
 
-  <script>
-  // Initialize map with performance optimizations
-  const map = L.map('map', { 
+    <script>
+  // Detect if the user is on a mobile device first
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+  // Base map options for all devices
+  const mapOptions = { 
     zoomControl: true, 
     worldCopyJump: false, 
     preferCanvas: true, 
-    zoomAnimation: false,
-    // Add scroll wheel optimizations to prevent flickering on desktop
-    zoomSnap: 0.30,
-    wheelPxPerZoomLevel: 150
-  });
+    zoomAnimation: false
+  };
+
+  // Add desktop-specific optimizations to prevent flickering
+  if (!isMobile) {
+    mapOptions.zoomSnap = 1; // Snap to whole zoom levels, preventing tile reloads
+    mapOptions.wheelPxPerZoomLevel = 150; // Controls scroll speed
+  }
+  
+  // Initialize map with the correct options for the device
+  const map = L.map('map', mapOptions);
 
   // Create map panes for layer control
   map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
@@ -126,11 +135,10 @@
   let detectedBounds = null;
 
   async function init() {
-    // Detect mobile to serve the appropriate file size
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    // We can now use the 'isMobile' variable defined globally above
     const pmtilesUrl = isMobile
-      ? "https://tiles.suavedroning.com/yellow-breeches-lite.pmtiles"
-      : "https://tiles.suavedroning.com/yellow-breeches.pmtiles";
+      ? "https://tiles.suavedroning.com/church-thermal-lite.pmtiles"
+      : "https://tiles.suavedroning.com/camp-hill-church.pmtiles";
 
     // Initialize the PMTiles source
     const p = new pmtiles.PMTiles(pmtilesUrl);
@@ -179,8 +187,8 @@
       map.setMinZoom(autoMin);
       map.setMaxZoom(maxAllowedZoom);
     } else {
-      // Fallback view for Yellow Breeches
-      map.setView([40.21, -76.98], 16);
+      // Fallback view for Camp Hill Church
+      map.setView([40.24, -76.92], 18);
       map.setMinZoom(0);
       map.setMaxZoom(maxAllowedZoom);
     }

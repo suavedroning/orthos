@@ -182,14 +182,14 @@
       const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
       map.setMinZoom(autoMin);
       
-      map.setMaxZoom(maxAllowedZoom);
+      
+    map.setMaxZoom(maxAllowedZoom);
     } else {
+
       map.setView([40.24, -76.92], 18);
       map.setMinZoom(0);
       
-      // *** FIX: Use our new smart max zoom level here too ***
       map.setMaxZoom(maxAllowedZoom);
-    }
 
     document.querySelector('.leaflet-container').style.background = '#f7f7f7';
     document.getElementById('loader').style.display = 'none';

@@ -178,7 +178,6 @@
       const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
       map.setMinZoom(autoMin);
       
-      // *** FIX: Use our new smart max zoom level ***
       map.setMaxZoom(maxAllowedZoom);
     } else {
 

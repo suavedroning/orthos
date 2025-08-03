@@ -117,8 +117,8 @@
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
 
   <script>
-  const map = L.map('map', { zoomControl: true, worldCopyJump: false });
-
+  const map = L.map('map', { zoomControl: true, worldCopyJump: false, preferCanvas: true });
+  
   map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
   map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 400;
 

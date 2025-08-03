@@ -58,10 +58,29 @@
         transform: translateX(0); /* Ensures smooth positioning */
       }
     }
+
+    #loader {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7); /* Semi-transparent black */
+      color: white;
+      z-index: 10000; /* Ensures it's on top of everything */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2em;
+      font-family: system-ui, sans-serif;
+    }
+
   </style>
 </head>
 <body>
   <div id="map"></div>
+
+  <div id="loader">Loading Map...</div> 
 
   <div class="panel">
     <h4>How to use</h4>
@@ -167,11 +186,12 @@
       map.setView([40.24, -76.92], 18);
       map.setMinZoom(0);
       
-      // *** FIX: Use our new smart max zoom level here too ***
       map.setMaxZoom(maxAllowedZoom);
     }
 
     document.querySelector('.leaflet-container').style.background = '#f7f7f7';
+    document.getElementById('loader').style.display = 'none';
+
   }
 
   init();

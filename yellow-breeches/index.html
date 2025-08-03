@@ -106,14 +106,7 @@
     zoomSnap: 0.30,
     wheelPxPerZoomLevel: 150
   });
-
-  if (!isMobile) {
-    mapOptions.zoomSnap = 1; // Snap to whole zoom levels, preventing tile reloads
-    mapOptions.wheelPxPerZoomLevel = 150; // Controls scroll speed
-  }
   
-  // Initialize map with the correct options for the device
-  const map = L.map('map', mapOptions);
 
   // Create map panes for layer control
   map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;

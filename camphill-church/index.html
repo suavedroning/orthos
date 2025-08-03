@@ -101,7 +101,10 @@
     zoomControl: true, 
     worldCopyJump: false, 
     preferCanvas: true, 
-    zoomAnimation: false 
+    zoomAnimation: false,
+    // Add scroll wheel optimizations to prevent flickering on desktop
+    zoomSnap: 0.25,
+    wheelPxPerZoomLevel: 120
   });
 
   // Create map panes for layer control
@@ -140,7 +143,7 @@
     const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
     const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
     
-    // *** FIXED: Clearer logic for setting max zoom on mobile vs. desktop ***
+    // Clearer logic for setting max zoom on mobile vs. desktop
     let maxAllowedZoom;
     if (isMobile) {
       // On mobile, limit zoom to prevent blur/crashes

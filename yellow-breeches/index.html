@@ -101,7 +101,10 @@
     zoomControl: true, 
     worldCopyJump: false, 
     preferCanvas: true, 
-    zoomAnimation: false 
+    zoomAnimation: false,
+    // Add scroll wheel optimizations to prevent flickering on desktop
+    zoomSnap: 0.25,
+    wheelPxPerZoomLevel: 120
   });
 
   // Create map panes for layer control

@@ -140,8 +140,15 @@
     const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
     const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
     
-    // Set a smart maximum zoom to prevent blurriness on mobile
-    const maxAllowedZoom = isMobile ? Math.min(maxNative + 1, 21) : 24;
+    // *** FIXED: Clearer logic for setting max zoom on mobile vs. desktop ***
+    let maxAllowedZoom;
+    if (isMobile) {
+      // On mobile, limit zoom to prevent blur/crashes
+      maxAllowedZoom = Math.min(maxNative + 1, 21);
+    } else {
+      // On desktop, allow deep zooming
+      maxAllowedZoom = 24;
+    }
 
     // Smartly find the geographic bounds from metadata or header
     let b = null;

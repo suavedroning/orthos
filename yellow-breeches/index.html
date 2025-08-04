@@ -99,19 +99,22 @@
   // Detect mobile to serve the appropriate file size
 const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-// Initialize map with performance optimizations
-const map = L.map('map', { 
-  zoomControl: true, 
-  worldCopyJump: false, 
-  preferCanvas: true, 
-  // Enable animations ONLY on desktop for a smoother zoom experience
-  // On mobile, keep them off to prioritize performance.
+// Set up map options conditionally
+const mapOptions = {
+  zoomControl: true,
+  worldCopyJump: false,
+  preferCanvas: true,
+
+  // --- Conditional Settings ---
+  // Desktop gets smooth, snapping zoom. Mobile gets original settings.
   zoomAnimation: !isMobile,
   fadeAnimation: !isMobile,
-  // Add scroll wheel optimizations to prevent flickering on desktop
-  zoomSnap: 0.30,
-  wheelPxPerZoomLevel: 80,
-});
+  zoomSnap: isMobile ? 0.30 : 1, 
+  wheelPxPerZoomLevel: isMobile ? 150 : 80 
+};
+
+// Initialize map with the chosen options
+const map = L.map('map', mapOptions);
   
 
   // Create map panes for layer control

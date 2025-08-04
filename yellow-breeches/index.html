@@ -114,7 +114,16 @@ const mapOptions = {
 };
 
 // Initialize map with the chosen options
-const map = L.map('map', mapOptions);
+const map = L.map('map', {
+  minZoom: 14, // set based on your lowest orthophoto zoom level
+  maxZoom: 21, // based on your tile resolution
+  maxBounds: [[latMin, lonMin], [latMax, lonMax]], // clamp to the valid image extent
+  maxBoundsViscosity: 1.0, // stops bounce on mobile
+  zoomSnap: 0.5,
+  zoomDelta: 0.5,
+  worldCopyJump: false,
+  inertia: true
+});
   
 
   // Create map panes for layer control

@@ -208,13 +208,10 @@ const map = L.map('map', mapOptions);
     detectedBounds = L.latLngBounds([s,w],[n,e]);
     map.fitBounds(detectedBounds, { padding: [10,10] });
     
-    // ====================================================================
-    // == FINAL STABILITY FIX: Separate Logic for Desktop vs. Mobile     ==
-    // ====================================================================
+    // Final Stability Fix: Separate Logic for Desktop vs. Mobile
     if (isMobile) {
-      // ON MOBILE: Prioritize stability. Lock the minZoom to the ortho's native minimum.
-      // This prevents zooming out to demanding basemap levels.
-      map.setMinZoom(minNative);
+      // ON MOBILE: Allow zooming out by ONLY ONE LEVEL for context, preventing crashes.
+      map.setMinZoom(Math.max(0, minNative - 1)); // <-- THE ONLY CHANGE IS HERE
     } else {
       // ON DESKTOP: Allow the nice overview since desktops have more memory.
       const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);

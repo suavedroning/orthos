@@ -134,7 +134,8 @@ const map = L.map('map', mapOptions);
     noWrap: true, 
     maxNativeZoom: 19, 
     maxZoom: 24, 
-    crossOrigin: true 
+    crossOrigin: true,
+    updateWhenIdle: isMobile // <-- THIS MAKES THE CHANGE MOBILE-ONLY
   }).addTo(map);
 
   let ortho = null;
@@ -246,7 +247,8 @@ const map = L.map('map', mapOptions);
     noWrap: true, 
     opacity: parseFloat(document.getElementById('opacity').value) || 1, 
     minNativeZoom: minNative, 
-    maxNativeZoom: maxNative 
+    maxNativeZoom: maxNative,
+    updateWhenIdle: isMobile // <-- THIS MAKES THE CHANGE MOBILE-ONLY
   }).addTo(map);
 
   // Fit map to the data's bounds if found, otherwise use a fallback

@@ -189,9 +189,15 @@ const map = L.map('map', mapOptions);
     detectedBounds = L.latLngBounds([s,w],[n,e]);
     map.fitBounds(detectedBounds, { padding: [10,10] });
     
-    // RESTORE THE OLD METHOD: Calculate minZoom automatically.
-    // This allows the overview you remember seeing.
-    const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
+    // Calculate minZoom automatically.
+    let autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2); // <-- Use 'let' instead of 'const'
+    
+    // **THIS IS THE CRITICAL FIX FOR MOBILE STABILITY**
+    // Enforce a safe minimum zoom "floor" on mobile to prevent memory crashes.
+    if (isMobile) {
+      autoMin = Math.max(autoMin, 13); 
+    }
+    
     map.setMinZoom(autoMin);
     map.setMaxZoom(maxAllowedZoom);
 

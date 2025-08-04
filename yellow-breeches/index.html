@@ -136,71 +136,69 @@ const map = L.map('map', mapOptions);
   let detectedBounds = null;
 
   async function init() {
-    // Detect mobile to serve the appropriate file size
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const pmtilesUrl = isMobile
-      ? "https://tiles.suavedroning.com/yellow-breeches-lite.pmtiles"
-      : "https://tiles.suavedroning.com/yellow-breeches.pmtiles";
+  // Use the appropriate file size for the device
+  const pmtilesUrl = isMobile
+    ? "https://tiles.suavedroning.com/yellow-breeches-lite.pmtiles"
+    : "https://tiles.suavedroning.com/yellow-breeches.pmtiles";
 
-    // Initialize the PMTiles source
-    const p = new pmtiles.PMTiles(pmtilesUrl);
-    
-    // Asynchronously get metadata from the PMTiles file
-    const header = await p.getHeader().catch(() => null);
-    const meta   = await p.getMetadata().catch(() => null);
-    
-    // Determine native zoom levels from the file, with defaults
-    const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
-    const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
-    
-    // Clearer logic for setting max zoom on mobile vs. desktop
-    let maxAllowedZoom;
-    if (isMobile) {
-      // On mobile, limit zoom to prevent blur/crashes
-      maxAllowedZoom = Math.min(maxNative + 1, 21);
-    } else {
-      // On desktop, allow deep zooming
-      maxAllowedZoom = 24;
-    }
-
-    // Smartly find the geographic bounds from metadata or header
-    let b = null;
-    if (meta?.bounds) {
-      b = Array.isArray(meta.bounds) ? meta.bounds.map(Number) : String(meta.bounds).split(',').map(Number);
-    } else if (header && Number.isFinite(header.minLon)) {
-      b = [header.minLon, header.minLat, header.maxLon, header.maxLat];
-    }
-
-    // Create the orthomosaic layer and add it to the map
-    ortho = pmtiles.leafletRasterLayer(p, { 
-      pane: 'orthoPane', 
-      noWrap: true, 
-      opacity: parseFloat(document.getElementById('opacity').value) || 1, 
-      minNativeZoom: minNative, 
-      maxNativeZoom: maxNative 
-    }).addTo(map);
-
-    // Fit map to the data's bounds if found, otherwise use a fallback
-    if (b?.length === 4 && b.every(Number.isFinite)) {
-      const [w,s,e,n] = b;
-      detectedBounds = L.latLngBounds([s,w],[n,e]);
-      map.fitBounds(detectedBounds, { padding: [10,10] });
-      const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
-      map.setMinZoom(autoMin);
-      map.setMaxZoom(maxAllowedZoom);
-    } else {
-      // Fallback view for Yellow Breeches
-      map.setView([40.21, -76.98], 16);
-      map.setMinZoom(0);
-      map.setMaxZoom(maxAllowedZoom);
-    }
-
-    // Set a background color for the map container
-    document.querySelector('.leaflet-container').style.background = '#f7f7f7';
-    
-    // Hide the loading screen now that everything is ready
-    document.getElementById('loader').style.display = 'none';
+  // Initialize the PMTiles source
+  const p = new pmtiles.PMTiles(pmtilesUrl);
+  
+  // Asynchronously get metadata from the PMTiles file
+  const header = await p.getHeader().catch(() => null);
+  const meta   = await p.getMetadata().catch(() => null);
+  
+  // Determine native zoom levels from the file, with defaults
+  const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
+  const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
+  
+  // Clearer logic for setting max zoom on mobile vs. desktop
+  let maxAllowedZoom;
+  if (isMobile) {
+    // On mobile, limit zoom to prevent blur/crashes
+    maxAllowedZoom = Math.min(maxNative + 1, 21);
+  } else {
+    // On desktop, allow deep zooming
+    maxAllowedZoom = 24;
   }
+
+  // Smartly find the geographic bounds from metadata or header
+  let b = null;
+  if (meta?.bounds) {
+    b = Array.isArray(meta.bounds) ? meta.bounds.map(Number) : String(meta.bounds).split(',').map(Number);
+  } else if (header && Number.isFinite(header.minLon)) {
+    b = [header.minLon, header.minLat, header.maxLon, header.maxLat];
+  }
+
+  // Create the orthomosaic layer and add it to the map
+  ortho = pmtiles.leafletRasterLayer(p, { 
+    pane: 'orthoPane', 
+    noWrap: true, 
+    opacity: parseFloat(document.getElementById('opacity').value) || 1, 
+    minNativeZoom: minNative, 
+    maxNativeZoom: maxNative 
+  }).addTo(map);
+
+  // Fit map to the data's bounds if found, otherwise use a fallback
+  if (b?.length === 4 && b.every(Number.isFinite)) {
+    const [w,s,e,n] = b;
+    detectedBounds = L.latLngBounds([s,w],[n,e]);
+    map.fitBounds(detectedBounds, { padding: [10,10] });
+    map.setMinZoom(minNative); // <-- THE FIX IS HERE
+    map.setMaxZoom(maxAllowedZoom);
+  } else {
+    // Fallback view for Yellow Breeches
+    map.setView([40.21, -76.98], 16);
+    map.setMinZoom(minNative); // <-- AND THE FIX IS HERE
+    map.setMaxZoom(maxAllowedZoom);
+  }
+
+  // Set a background color for the map container
+  document.querySelector('.leaflet-container').style.background = '#f7f7f7';
+  
+  // Hide the loading screen now that everything is ready
+  document.getElementById('loader').style.display = 'none';
+}
 
   // Start the map initialization process
   init();

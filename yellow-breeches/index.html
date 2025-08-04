@@ -96,16 +96,22 @@
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
 
   <script>
-  // Initialize map with performance optimizations
-  const map = L.map('map', { 
-    zoomControl: true, 
-    worldCopyJump: false, 
-    preferCanvas: true, 
-    zoomAnimation: false,
-    // Add scroll wheel optimizations to prevent flickering on desktop
-    zoomSnap: 0.30,
-    wheelPxPerZoomLevel: 150
-  });
+  // Detect mobile to serve the appropriate file size
+const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+// Initialize map with performance optimizations
+const map = L.map('map', { 
+  zoomControl: true, 
+  worldCopyJump: false, 
+  preferCanvas: true, 
+  // Enable animations ONLY on desktop for a smoother zoom experience
+  // On mobile, keep them off to prioritize performance.
+  zoomAnimation: !isMobile,
+  fadeAnimation: !isMobile,
+  // Add scroll wheel optimizations to prevent flickering on desktop
+  zoomSnap: 0.30,
+  wheelPxPerZoomLevel: 150
+});
   
 
   // Create map panes for layer control

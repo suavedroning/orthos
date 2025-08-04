@@ -211,7 +211,7 @@ const map = L.map('map', mapOptions);
     // Final Stability Fix: Separate Logic for Desktop vs. Mobile
     if (isMobile) {
       // ON MOBILE: Allow zooming out by ONLY ONE LEVEL for context, preventing crashes.
-      map.setMinZoom(Math.max(0, minNative - 1)); // <-- THE ONLY CHANGE IS HERE
+      map.setMinZoom(Math.max(0, minNative - 1.8)); // <-- THE ONLY CHANGE IS HERE
     } else {
       // ON DESKTOP: Allow the nice overview since desktops have more memory.
       const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);

@@ -174,11 +174,9 @@ const map = L.map('map', mapOptions);
   const header = await p.getHeader().catch(() => null);
   const meta   = await p.getMetadata().catch(() => null);
   
-  // We will still read these values for the layer, but not trust minZoom for the map itself.
   const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
   const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
   
-  // Set max zoom to prevent pixelation.
   let maxAllowedZoom;
   if (isMobile) {
     maxAllowedZoom = Math.min(maxNative + 1, 21);
@@ -210,25 +208,23 @@ const map = L.map('map', mapOptions);
     detectedBounds = L.latLngBounds([s,w],[n,e]);
     map.fitBounds(detectedBounds, { padding: [10,10] });
     
-    // Calculate minZoom automatically.
-    let autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
-    
-    // ====================================================================
-    // == THIS IS THE CRITICAL FIX THAT WAS MISSING                      ==
-    // == It enforces a safe minimum zoom "floor" on mobile devices.   ==
+    // Final Stability Fix: Separate Logic for Desktop vs. Mobile
     if (isMobile) {
-      autoMin = Math.max(autoMin, 13); 
+      // ON MOBILE: Allow zooming out by ONLY ONE LEVEL for context, preventing crashes.
+      map.setMinZoom(Math.max(0, minNative - 2)); // <-- THE ONLY CHANGE IS HERE
+    } else {
+      // ON DESKTOP: Allow the nice overview since desktops have more memory.
+      const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
+      map.setMinZoom(autoMin);
     }
-    // ====================================================================
     
-    map.setMinZoom(autoMin);
     map.setMaxZoom(maxAllowedZoom);
 
   } else {
     // Fallback view
-    map.setView([40.24, -76.92], 18); // Adjusted for Camp Hill
-    // USE A SAFE FALLBACK: This prevents the crash if metadata fails to load.
-    map.setMinZoom(13); 
+    map.setView([40.24, -76.92], 18);
+    // Use a safe fallback that works for both mobile and desktop
+    map.setMinZoom(14); 
     map.setMaxZoom(maxAllowedZoom);
   }
 

@@ -9,6 +9,7 @@
   <!-- LEAFLET & PLUGIN STYLES -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.css">
 
 
   <style>
@@ -46,7 +47,7 @@
       position: absolute; 
       top: 15px; 
       right: 15px; 
-      z-index: 999; /* Lowered z-index to not interfere with draw controls */
+      z-index: 999; 
       background: rgba(255,255,255,0.98); 
       border-radius: 12px; 
       padding: 15px 20px;
@@ -65,6 +66,10 @@
     
     .control-group {
         margin-bottom: 15px;
+    }
+    
+    .control-group:last-child {
+        margin-bottom: 0;
     }
     
     .control-group label {
@@ -144,7 +149,7 @@
     .logo img { height:28px }
     
     .back-link {
-      position:absolute; top:15px; left: 80px; /* Adjusted position */
+      position:absolute; top:15px; left: 80px; 
       z-index:999;
       background:#fff; border:1px solid #ccc; border-radius:8px;
       padding:8px 10px; text-decoration:none; color:#111;
@@ -152,7 +157,6 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
 
-    /* NEW: Styles for the popup links */
     .popup-link {
         display: block;
         margin-top: 8px;
@@ -194,10 +198,31 @@
         <label>Layer Visibility</label>
         <div class="control-row"><input id="toggle-ortho" type="checkbox" checked><label for="toggle-ortho">Show Orthomosaic</label></div>
         <div class="control-row"><input id="toggle-basemap" type="checkbox" checked><label for="toggle-basemap">Show Base Map</label></div>
+        <!-- NEW: Checkboxes for annotation layers -->
+        <div class="control-row"><input id="toggle-suave-notes" type="checkbox" checked><label for="toggle-suave-notes">Show Suave Droning Analysis</label></div>
+        <div class="control-row"><input id="toggle-client-notes" type="checkbox" checked><label for="toggle-client-notes">Show Client Notes</label></div>
+    </div>
+    
+    <div class="control-group">
+      <details>
+        <summary style="cursor: pointer; font-weight: 500;">Map Instructions</summary>
+        <p style="font-size: 13px; color: #555; margin-top: 8px; line-height: 1.5;">
+          <strong>Measurements:</strong> Use the tools in the top-left corner to measure distances and areas.<br><br>
+          <strong>Client Notes:</strong> To add a note, select the marker icon, click a location on the map, and fill out the form that appears.
+        </p>
+      </details>
     </div>
     <div class="control-group">
         <button id="recenter">Recenter Map</button>
     </div>
+  
+  <div class="control-group">
+      <label>Export Annotations</label>
+      <div style="display: flex; gap: 10px; margin-top: 8px;">
+        <button id="export-geojson" style="flex: 1;">As Map File</button>
+        <button id="export-csv" style="flex: 1;">As List (CSV)</button>
+      </div>
+  </div>
   </div>
 
   <a class="back-link" href="../">← Back to Portfolio</a>
@@ -207,6 +232,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.js"></script>
 
 
 <script>
@@ -227,9 +253,10 @@
   // Initialize map with the chosen options
   const map = L.map('map', mapOptions);
   
-  // Create map panes for layer control
+  // Create dedicated map panes for proper layer ordering
   map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
-  map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 400;
+  map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 300;
+  map.createPane('drawPane');    map.getPane('drawPane').style.zIndex = 650;
 
   // Add the base map layer
   const basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
@@ -246,84 +273,146 @@
   let ortho = null;
   let detectedBounds = null;
 
-  // --- INITIALIZE LEAFLET.DRAW ---
-  const drawnItems = new L.FeatureGroup();
-  map.addLayer(drawnItems);
+  // --- ANNOTATION LAYERS ---
+  const suaveAnnotations = new L.FeatureGroup([], { pane: 'drawPane' }).addTo(map);
+  const clientAnnotations = new L.FeatureGroup([], { pane: 'drawPane' }).addTo(map);
 
-  const drawControl = new L.Control.Draw({
-      position: 'topleft',
-      edit: {
-          featureGroup: drawnItems,
-          remove: true
-      },
-      draw: {
-          polygon: {
-              allowIntersection: false,
-              showArea: true,
-              metric: false, // Use imperial units
-              feet: true,
-          },
-          polyline: {
-              shapeOptions: {
-                  color: '#f357a1',
-                  weight: 4
-              },
-              metric: false,
-              feet: true,
-          },
-          rectangle: {
-              showArea: true,
-              metric: false,
-              feet: true,
-          },
-          circle: false,
-          marker: true,
-          circlemarker: false
-      }
-  });
-  map.addControl(drawControl);
+  // --- CONDITIONAL DRAWING/MEASUREMENT TOOLS ---
+  if (isMobile) {
+    // On mobile, use the simpler, more touch-friendly measurement tool
+    const measureControl = new L.Control.Measure({
+        position: 'topleft',
+        primaryLengthUnit: 'feet',
+        secondaryLengthUnit: 'miles',
+        primaryAreaUnit: 'sqfeet',
+        secondaryAreaUnit: 'acres',
+        activeColor: '#db4a29',
+        completedColor: '#9d351d'
+    });
+    measureControl.addTo(map);
+  } else {
+    // On desktop, use the full-featured Leaflet.draw toolbar
+    const drawControl = new L.Control.Draw({
+        position: 'topleft',
+        edit: {
+            featureGroup: clientAnnotations, // Only allow editing of client's own notes
+            remove: true
+        },
+        draw: {
+            polygon: { allowIntersection: false, showArea: true, metric: false, feet: true },
+            polyline: { shapeOptions: { color: '#f357a1', weight: 4 }, metric: false, feet: true },
+            rectangle: { showArea: true, metric: false, feet: true },
+            circle: false,
+            marker: true,
+            circlemarker: false
+        }
+    });
+    map.addControl(drawControl);
 
+  }
+
+  // --- This is the updated code block ---
   map.on(L.Draw.Event.CREATED, function (event) {
       const layer = event.layer;
-      drawnItems.addLayer(layer);
+      clientAnnotations.addLayer(layer);
+
+      // --- This function creates the form for adding/editing a note ---
+      function createNoteForm(currentNote = "") {
+          const formContainer = document.createElement('div');
+          formContainer.innerHTML = `
+              <strong style="font-size: 1.1em;">Add/Edit Note</strong>
+              <textarea style="width: 95%; height: 60px; margin-top: 8px; border: 1px solid #ccc; border-radius: 4px; padding: 5px; font-family: inherit;" placeholder="Type note for vendor, etc.">${currentNote}</textarea>
+              <div style="margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px;">
+                  <button class="cancel-note-btn" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">Cancel</button>
+                  <button class="save-note-btn" style="padding: 5px 10px; border: 0; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer;">Save Note</button>
+              </div>
+          `;
+
+          // --- Event Handlers for the form buttons ---
+          formContainer.querySelector('.save-note-btn').addEventListener('click', () => {
+              const noteText = formContainer.querySelector('textarea').value;
+              displaySavedNote(noteText); // Show the saved note
+          });
+
+          formContainer.querySelector('.cancel-note-btn').addEventListener('click', () => {
+              // If it was a brand new marker, cancel removes it.
+              // If it was an existing marker, it just closes the popup.
+              if (!currentNote) {
+                  clientAnnotations.removeLayer(layer);
+              } else {
+                  layer.closePopup();
+              }
+          });
+          
+          return formContainer;
+      }
       
-      let content;
-      if (event.layerType === 'polyline') {
+      // --- This function displays the saved note with an Edit button ---
+      function displaySavedNote(noteText) {
+          const latlng = layer.getLatLng();
+          const lat = latlng.lat;
+          const lng = latlng.lng;
+          
+          const googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+          const appleMapsUrl = `http://maps.apple.com/?ll=${lat},${lng}`;
+          
+          const finalContent = document.createElement('div');
+          finalContent.innerHTML = `
+              <strong style="font-size: 1.1em;">Client Note:</strong>
+              <p class="saved-note" style="margin: 4px 0 12px; white-space: pre-wrap;">${noteText || '<em>No note provided.</em>'}</p>
+              <strong>Location:</strong><br>
+              Lat: ${lat.toFixed(6)}<br>
+              Lng: ${lng.toFixed(6)}
+              <a href="${googleMapsUrl}" target="_blank" class="popup-link">Open in Google Maps</a>
+              <a href="${appleMapsUrl}" target="_blank" class="popup-link">Open in Apple Maps</a>
+              <button class="edit-note-btn" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; margin-top: 10px; width: 100%;">Edit Note</button>
+          `;
+          
+          finalContent.querySelector('.edit-note-btn').addEventListener('click', () => {
+              const currentNote = finalContent.querySelector('.saved-note').textContent;
+              layer.setPopupContent(createNoteForm(currentNote));
+          });
+          
+          layer.setPopupContent(finalContent);
+      }
+
+      // --- Main Logic for different shapes ---
+      if (event.layerType === 'marker') {
+          layer.bindPopup(createNoteForm(), { minWidth: 250 }).openPopup();
+      } else if (event.layerType === 'polyline') {
+          // ... (rest of your polyline and polygon code is unchanged)
           const latlngs = layer.getLatLngs();
           let distance = 0;
           for (let i = 0; i < latlngs.length - 1; i++) {
               distance += latlngs[i].distanceTo(latlngs[i + 1]);
           }
           const distanceFt = distance * 3.28084;
-          content = `<strong>Distance:</strong> ${distanceFt.toFixed(2)} ft`;
+          const content = `<strong>Distance:</strong> ${distanceFt.toFixed(2)} ft`;
+          layer.bindPopup(content).openPopup();
       } else if (event.layerType === 'polygon' || event.layerType === 'rectangle') {
           const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
           const areaSqFt = area * 10.7639;
           const areaAcres = areaSqFt / 43560;
-          content = `<strong>Area:</strong> ${areaSqFt.toFixed(2)} sq ft<br>(${areaAcres.toFixed(4)} acres)`;
-      } else if (event.layerType === 'marker') {
-          const latlng = layer.getLatLng();
-          const lat = latlng.lat;
-          const lng = latlng.lng;
-          
-          // --- NEW: Create Google and Apple Maps links ---
-          const googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-          const appleMapsUrl = `http://maps.apple.com/?ll=${lat},${lng}`;
-
-          content = `
-              <strong>Location:</strong><br>
-              Lat: ${lat.toFixed(6)}<br>
-              Lng: ${lng.toFixed(6)}
-              <a href="${googleMapsUrl}" target="_blank" class="popup-link">Open in Google Maps</a>
-              <a href="${appleMapsUrl}" target="_blank" class="popup-link">Open in Apple Maps</a>
-          `;
-          // --- END OF NEW CODE ---
-      }
-      
-      if (content) {
+          const content = `<strong>Area:</strong> ${areaSqFt.toFixed(2)} sq ft<br>(${areaAcres.toFixed(4)} acres)`;
           layer.bindPopup(content).openPopup();
       }
   });
+
+  
+
+  // --- DATA LOADING ---
+  async function loadSuaveAnnotations() {
+      // This is where you would load your pre-made annotations.
+      // For now, it's a placeholder.
+      // Example:
+      // const response = await fetch('path/to/your/analysis.geojson');
+      // const data = await response.json();
+      // L.geoJSON(data).eachLayer(layer => suaveAnnotations.addLayer(layer));
+      
+      // Placeholder example marker:
+      // const exampleMarker = L.marker([40.198150, -76.929075]).bindPopup("<strong>Suave Droning Analysis:</strong><br>This is an example note from Suave Droning.");
+      // suaveAnnotations.addLayer(exampleMarker);
+  }
 
  async function init() {
   const pmtilesUrl = isMobile
@@ -381,42 +470,123 @@
     map.setMaxZoom(maxAllowedZoom);
   }
 
-  document.querySelector('.leaflet-container').style.background = '#f7f7f7';
+  loadSuaveAnnotations(); // Load your pre-made notes
   document.getElementById('loader').style.display = 'none';
 }
 
   init();
 
-  // --- UI Event Handlers ---
+  // --- UI EVENT HANDLERS ---
   document.getElementById('toggle-ortho').addEventListener('change', e => { 
     if (!ortho) return; 
-    if (e.target.checked) { 
-      map.addLayer(ortho); 
-      ortho.bringToFront(); 
-    } else { 
-      map.removeLayer(ortho); 
-    } 
+    if (e.target.checked) map.addLayer(ortho); else map.removeLayer(ortho); 
   });
   
   document.getElementById('toggle-basemap').addEventListener('change', e => { 
-    if (e.target.checked) { 
-      map.addLayer(basemap); 
-    } else { 
-      map.removeLayer(basemap); 
-    } 
+    if (e.target.checked) map.addLayer(basemap); else map.removeLayer(basemap); 
+  });
+  
+  document.getElementById('toggle-suave-notes').addEventListener('change', e => { 
+    if (e.target.checked) map.addLayer(suaveAnnotations); else map.removeLayer(suaveAnnotations); 
+  });
+
+  document.getElementById('toggle-client-notes').addEventListener('change', e => { 
+    if (e.target.checked) map.addLayer(clientAnnotations); else map.removeLayer(clientAnnotations); 
   });
   
   document.getElementById('recenter').addEventListener('click', () => { 
-    if (detectedBounds) {
-      map.fitBounds(detectedBounds, { padding:[10,10] }); 
-    }
+    if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] }); 
   });
   
   document.getElementById('opacity').addEventListener('input', e => { 
-    if (ortho) {
-      ortho.setOpacity(parseFloat(e.target.value)); 
-    }
+    if (ortho) ortho.setOpacity(parseFloat(e.target.value)); 
   });
+
+  // --- NEW: EXPORT FUNCTIONALITY ---
+
+  // Helper function to trigger a file download in the browser
+  function downloadFile(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  }
+
+  // --- Export as GeoJSON (Map Data File) ---
+  document.getElementById('export-geojson').addEventListener('click', () => {
+    if (clientAnnotations.getLayers().length === 0) {
+        alert("There are no client annotations to export.");
+        return;
+    }
+    const geojsonData = clientAnnotations.toGeoJSON();
+    const dataString = JSON.stringify(geojsonData, null, 2); // Pretty print the JSON
+    downloadFile('suave-droning-annotations.geojson', dataString, 'application/json');
+  });
+
+
+  // --- Export as CSV (Static List with Lat/Long) ---
+  document.getElementById('export-csv').addEventListener('click', () => {
+    const layers = clientAnnotations.getLayers();
+    if (layers.length === 0) {
+        alert("There are no client annotations to export.");
+        return;
+    }
+
+    let csvContent = 'Type,Note,Latitude,Longitude,Details\n'; // CSV Header
+
+    layers.forEach(layer => {
+        let type = 'Shape';
+        let note = 'N/A';
+        let lat = 'N/A';
+        let lng = 'N/A';
+        let details = 'N/A';
+
+        if (layer instanceof L.Marker) {
+            type = 'Note / Marker';
+            const latlng = layer.getLatLng();
+            lat = latlng.lat.toFixed(6);
+            lng = latlng.lng.toFixed(6);
+
+            // Extract the note from the popup's HTML content
+            const popupContent = layer.getPopup()?.getContent() || '';
+            if (typeof popupContent === 'string' && popupContent.includes('<p>')) {
+              note = popupContent.split('<p style="margin: 4px 0 12px; white-space: pre-wrap;">')[1]
+                                 .split('</p>')[0]
+                                 .replace(/<em>(.*?)<\/em>/g, ''); // Remove em tags
+            }
+        } else if (layer instanceof L.Polygon) {
+            type = 'Area / Polygon';
+            const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+            const areaSqFt = (area * 10.7639).toFixed(2);
+            details = `${areaSqFt} sq ft`;
+            const center = layer.getBounds().getCenter();
+            lat = center.lat.toFixed(6);
+            lng = center.lng.toFixed(6);
+        } else if (layer instanceof L.Polyline) {
+            type = 'Measurement / Line';
+            const latlngs = layer.getLatLngs();
+            let distance = 0;
+            for (let i = 0; i < latlngs.length - 1; i++) {
+                distance += latlngs[i].distanceTo(latlngs[i + 1]);
+            }
+            const distanceFt = (distance * 3.28084).toFixed(2);
+            details = `${distanceFt} ft`;
+            const center = layer.getBounds().getCenter();
+            lat = center.lat.toFixed(6);
+            lng = center.lng.toFixed(6);
+        }
+        
+        // Add a new row to the CSV string
+        csvContent += `"${type}","${note}","${lat}","${lng}","${details}"\n`;
+    });
+
+    downloadFile('suave-droning-report.csv', csvContent, 'text/csv;charset=utf-8;');
+  });
+  
 </script>
 
 </body>

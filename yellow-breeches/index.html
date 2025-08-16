@@ -5,99 +5,177 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Suave Droning • Yellow Breeches Orthomosaic</title>
   <link rel="icon" href="../assets/favicon.ico" type="image/x-icon">
+  
+  <!-- LEAFLET & PLUGIN STYLES -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-    html, body { height: 100%; margin: 0 }
-    #map { width:100%; height:100% }
-
-    /* Style the draggable thumb for Chrome, Safari, Edge */
-  #opacity::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 26px;      /* Set a much larger width */
-    height: 26px;     /* Set a much larger height */
-    border-radius: 50%; /* Make it a circle */
-    background: #007bff; /* A nice blue color */
-    cursor: pointer;
-    border: 2px solid #fff; /* White border to stand out */
-    box-shadow: 0 0 4px rgba(0,0,0,0.2); /* Subtle shadow */
-    margin-top: -8px; /* Vertically center the thumb on the track */
-  }
-
-  /* Style the draggable thumb for Firefox */
-  #opacity::-moz-range-thumb {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: #007bff;
-    cursor: pointer;
-    border: 2px solid #fff;
-    box-shadow: 0 0 4px rgba(0,0,0,0.2);
-  }
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 
 
-    .panel {
-      position: absolute; top:12px; left:12px; z-index:9999;
-      background: rgba(255,255,255,0.96); border-radius:10px; padding:12px 14px;
-      font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width:340px;
+  <style>
+    /* BASE STYLES */
+    html, body { 
+        height: 100%; 
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
-    .panel h4 { margin:0 0 6px; font-size:14px }
-    .row { display:flex; align-items:center; gap:8px; margin-top:8px }
-    .panel button {
-      cursor:pointer; padding:6px 10px; border:1px solid #ccc;
-      border-radius:6px; background:#fff;
+    #map { 
+        width:100%; 
+        height:100%;
+        background: #f0f0f0;
     }
 
-    .right-panel {
-      position:absolute; top:12px; right:12px; z-index:9999;
-      background:rgba(255,255,255,0.96); border-radius:10px; padding:12px 14px;
-      width:220px; font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      box-shadow:0 2px 8px rgba(0,0,0,0.15);
-    }
-    .right-panel label { display:block; margin-bottom:6px }
-    .right-panel input[type="range"] { width:100% }
-
-    .logo {
-      position:absolute; bottom:12px; left:12px; z-index:9999;
-      background:rgba(255,255,255,0.9); border-radius:8px; padding:8px 12px;
-      font:600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      box-shadow:0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px;
-    }
-    .logo img { height:28px }
-
-    .back {
-      position:absolute; top:100px; right:12px; z-index:9999;
-    }
-    .back a {
-      background:#fff; border:1px solid #ccc; border-radius:8px;
-      padding:8px 10px; text-decoration:none; color:#111;
-      font:13px system-ui;
-    }
-
+    /* LOADER STYLE */
     #loader {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.8);
       color: white;
       z-index: 10000;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2em;
-      font-family: system-ui, sans-serif;
+      font-size: 1.5em;
+      font-weight: 500;
     }
 
+    /* MODERN CONTROL PANEL */
+    .control-panel {
+      position: absolute; 
+      top: 15px; 
+      right: 15px; 
+      z-index: 999; /* Lowered z-index to not interfere with draw controls */
+      background: rgba(255,255,255,0.98); 
+      border-radius: 12px; 
+      padding: 15px 20px;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+      max-width: 280px;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .control-panel h4 { 
+        margin: 0 0 12px; 
+        font-size: 16px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .control-group {
+        margin-bottom: 15px;
+    }
+    
+    .control-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .control-row { 
+        display:flex; 
+        align-items:center; 
+        gap:10px; 
+        margin-top:8px; 
+    }
+    
+    .control-row input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+
+    .control-panel button {
+      cursor:pointer; 
+      padding: 8px 12px; 
+      border: 1px solid #ccc;
+      border-radius: 6px; 
+      background:#fff;
+      width: 100%;
+      margin-top: 10px;
+    }
+    .control-panel button:hover {
+        background: #f7f7f7;
+    }
+
+    /* MODERN SLIDER */
+    input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        background: #ddd;
+        border-radius: 5px;
+        outline: none;
+        opacity: 0.7;
+        transition: opacity .2s;
+    }
+    input[type="range"]:hover {
+        opacity: 1;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        background: #007bff;
+        cursor: pointer;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 4px rgba(0,0,0,0.2);
+    }
+    input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #007bff;
+        cursor: pointer;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 4px rgba(0,0,0,0.2);
+    }
+
+    /* LOGO & BACK BUTTON */
+    .logo {
+      position:absolute; bottom:15px; left:15px; z-index:999;
+      background:rgba(255,255,255,0.9); border-radius:8px; padding:8px 12px;
+      font:600 13px system-ui;
+      box-shadow:0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px;
+    }
+    .logo img { height:28px }
+    
+    .back-link {
+      position:absolute; top:15px; left: 80px; /* Adjusted position */
+      z-index:999;
+      background:#fff; border:1px solid #ccc; border-radius:8px;
+      padding:8px 10px; text-decoration:none; color:#111;
+      font:13px system-ui;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    /* NEW: Styles for the popup links */
+    .popup-link {
+        display: block;
+        margin-top: 8px;
+        text-decoration: none;
+        color: #007bff;
+        font-weight: 500;
+    }
+    .popup-link:hover {
+        text-decoration: underline;
+    }
+
+    /* RESPONSIVE DESIGN */
     @media (max-width: 600px) {
-      .right-panel {
+      .control-panel {
         top: auto;
-        right: 1.5rem;
-        bottom: 5rem;
-        width: 180px;
-        transform: translateX(0);
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
+        max-width: none;
+      }
+      .back-link {
+          top: 15px;
+          left: 15px;
       }
     }
   </style>
@@ -106,41 +184,48 @@
   <div id="map"></div>
   <div id="loader">Loading Map...</div> 
 
-  <div class="panel">
-    <h4>How to use</h4>
-    <div>Scroll or pinch to zoom. Drag to pan. Toggle layers below. If you get lost, click Recenter.</div>
-    <div class="row"><input id="toggle-ortho" type="checkbox" checked><label for="toggle-ortho">Show orthomosaic</label></div>
-    <div class="row"><input id="toggle-basemap" type="checkbox" checked><label for="toggle-basemap">Show base map</label></div>
-    <div class="row"><button id="recenter">Recenter</button></div>
+  <div class="control-panel">
+    <h4>Map Controls</h4>
+    <div class="control-group">
+        <label for="opacity">Orthomosaic Opacity</label>
+        <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
+    </div>
+    <div class="control-group">
+        <label>Layer Visibility</label>
+        <div class="control-row"><input id="toggle-ortho" type="checkbox" checked><label for="toggle-ortho">Show Orthomosaic</label></div>
+        <div class="control-row"><input id="toggle-basemap" type="checkbox" checked><label for="toggle-basemap">Show Base Map</label></div>
+    </div>
+    <div class="control-group">
+        <button id="recenter">Recenter Map</button>
+    </div>
   </div>
 
-  <div class="right-panel"><label for="opacity">Orthomosaic opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="1"></div>
-  <div class="back"><a href="../">← Back to portfolio</a></div>
-  <div class="logo"><img src="./assets/logo1.svg" alt="Suave Droning" /><span>Suave Droning • Orthomosaic</span></div>
+  <a class="back-link" href="../">← Back to Portfolio</a>
+  <div class="logo"><img src="./assets/logo1.svg" alt="Suave Droning" /><span>Suave Droning</span></div>
 
+  <!-- JAVASCRIPT LIBRARIES -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
 
 <script>
   // Detect mobile to serve the appropriate file size
-const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-// Set up map options conditionally
-const mapOptions = {
-  zoomControl: true,
-  worldCopyJump: false,
-  preferCanvas: true,
+  // Set up map options conditionally
+  const mapOptions = {
+    zoomControl: true,
+    worldCopyJump: false,
+    preferCanvas: true,
+    zoomAnimation: !isMobile,
+    fadeAnimation: !isMobile,
+    zoomSnap: isMobile ? 0.30 : 1, 
+    wheelPxPerZoomLevel: isMobile ? 150 : 80 
+  };
 
-  // --- Conditional Settings ---
-  // Desktop gets smooth, snapping zoom. Mobile gets original settings.
-  zoomAnimation: !isMobile,
-  fadeAnimation: !isMobile,
-  zoomSnap: isMobile ? 0.30 : 1, 
-  wheelPxPerZoomLevel: isMobile ? 150 : 80 
-};
-
-// Initialize map with the chosen options
-const map = L.map('map', mapOptions);
+  // Initialize map with the chosen options
+  const map = L.map('map', mapOptions);
   
   // Create map panes for layer control
   map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
@@ -155,22 +240,98 @@ const map = L.map('map', mapOptions);
     maxNativeZoom: 19, 
     maxZoom: 24, 
     crossOrigin: true,
-    updateWhenIdle: isMobile // <-- THIS MAKES THE CHANGE MOBILE-ONLY
+    updateWhenIdle: isMobile
   }).addTo(map);
 
   let ortho = null;
   let detectedBounds = null;
 
+  // --- INITIALIZE LEAFLET.DRAW ---
+  const drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+
+  const drawControl = new L.Control.Draw({
+      position: 'topleft',
+      edit: {
+          featureGroup: drawnItems,
+          remove: true
+      },
+      draw: {
+          polygon: {
+              allowIntersection: false,
+              showArea: true,
+              metric: false, // Use imperial units
+              feet: true,
+          },
+          polyline: {
+              shapeOptions: {
+                  color: '#f357a1',
+                  weight: 4
+              },
+              metric: false,
+              feet: true,
+          },
+          rectangle: {
+              showArea: true,
+              metric: false,
+              feet: true,
+          },
+          circle: false,
+          marker: true,
+          circlemarker: false
+      }
+  });
+  map.addControl(drawControl);
+
+  map.on(L.Draw.Event.CREATED, function (event) {
+      const layer = event.layer;
+      drawnItems.addLayer(layer);
+      
+      let content;
+      if (event.layerType === 'polyline') {
+          const latlngs = layer.getLatLngs();
+          let distance = 0;
+          for (let i = 0; i < latlngs.length - 1; i++) {
+              distance += latlngs[i].distanceTo(latlngs[i + 1]);
+          }
+          const distanceFt = distance * 3.28084;
+          content = `<strong>Distance:</strong> ${distanceFt.toFixed(2)} ft`;
+      } else if (event.layerType === 'polygon' || event.layerType === 'rectangle') {
+          const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+          const areaSqFt = area * 10.7639;
+          const areaAcres = areaSqFt / 43560;
+          content = `<strong>Area:</strong> ${areaSqFt.toFixed(2)} sq ft<br>(${areaAcres.toFixed(4)} acres)`;
+      } else if (event.layerType === 'marker') {
+          const latlng = layer.getLatLng();
+          const lat = latlng.lat;
+          const lng = latlng.lng;
+          
+          // --- NEW: Create Google and Apple Maps links ---
+          const googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+          const appleMapsUrl = `http://maps.apple.com/?ll=${lat},${lng}`;
+
+          content = `
+              <strong>Location:</strong><br>
+              Lat: ${lat.toFixed(6)}<br>
+              Lng: ${lng.toFixed(6)}
+              <a href="${googleMapsUrl}" target="_blank" class="popup-link">Open in Google Maps</a>
+              <a href="${appleMapsUrl}" target="_blank" class="popup-link">Open in Apple Maps</a>
+          `;
+          // --- END OF NEW CODE ---
+      }
+      
+      if (content) {
+          layer.bindPopup(content).openPopup();
+      }
+  });
+
  async function init() {
-  // Use the appropriate file size for the device
   const pmtilesUrl = isMobile
     ? "https://tiles.suavedroning.com/yellow-breeches-lite.pmtiles"
     : "https://tiles.suavedroning.com/yellow-breeches.pmtiles";
 
-  // Initialize the PMTiles source
   const p = new pmtiles.PMTiles(pmtilesUrl);
   
-  // Asynchronously get metadata from the PMTiles file
   const header = await p.getHeader().catch(() => null);
   const meta   = await p.getMetadata().catch(() => null);
   
@@ -184,7 +345,6 @@ const map = L.map('map', mapOptions);
     maxAllowedZoom = maxNative;
   }
 
-  // Smartly find the geographic bounds from metadata or header
   let b = null;
   if (meta?.bounds) {
     b = Array.isArray(meta.bounds) ? meta.bounds.map(Number) : String(meta.bounds).split(',').map(Number);
@@ -192,7 +352,6 @@ const map = L.map('map', mapOptions);
     b = [header.minLon, header.minLat, header.maxLon, header.maxLat];
   }
 
-  // Create the orthomosaic layer and add it to the map
   ortho = pmtiles.leafletRasterLayer(p, { 
     pane: 'orthoPane', 
     noWrap: true, 
@@ -202,18 +361,14 @@ const map = L.map('map', mapOptions);
     updateWhenIdle: isMobile
   }).addTo(map);
 
-  // Fit map to the data's bounds if found, otherwise use a fallback
   if (b?.length === 4 && b.every(Number.isFinite)) {
     const [w,s,e,n] = b;
     detectedBounds = L.latLngBounds([s,w],[n,e]);
     map.fitBounds(detectedBounds, { padding: [10,10] });
     
-    // Final Stability Fix: Separate Logic for Desktop vs. Mobile
     if (isMobile) {
-      // ON MOBILE: Allow zooming out by ONLY ONE LEVEL for context, preventing crashes.
-      map.setMinZoom(Math.max(0, minNative - 2)); // <-- THE ONLY CHANGE IS HERE
+      map.setMinZoom(Math.max(0, minNative - 2));
     } else {
-      // ON DESKTOP: Allow the nice overview since desktops have more memory.
       const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
       map.setMinZoom(autoMin);
     }
@@ -221,21 +376,15 @@ const map = L.map('map', mapOptions);
     map.setMaxZoom(maxAllowedZoom);
 
   } else {
-    // Fallback view
     map.setView([40.24, -76.92], 18);
-    // Use a safe fallback that works for both mobile and desktop
     map.setMinZoom(14); 
     map.setMaxZoom(maxAllowedZoom);
   }
 
-  // Set a background color for the map container
   document.querySelector('.leaflet-container').style.background = '#f7f7f7';
-  
-  // Hide the loading screen now that everything is ready
   document.getElementById('loader').style.display = 'none';
 }
 
-  // Start the map initialization process
   init();
 
   // --- UI Event Handlers ---
@@ -268,8 +417,6 @@ const map = L.map('map', mapOptions);
       ortho.setOpacity(parseFloat(e.target.value)); 
     }
   });
-
-
 </script>
 
 </body>

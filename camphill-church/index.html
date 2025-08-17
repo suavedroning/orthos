@@ -5,120 +5,293 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Suave Droning • Camp Hill Church Orthomosaic</title>
   <link rel="icon" href="../assets/favicon.ico" type="image/x-icon">
+  
+  <!-- LEAFLET & PLUGIN STYLES -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.css">
+
+
   <style>
-    html, body { height: 100%; margin: 0 }
-    #map { width:100%; height:100% }
-
-    .panel {
-      position: absolute; top:12px; left:12px; z-index:9999;
-      background: rgba(255,255,255,0.96); border-radius:10px; padding:12px 14px;
-      font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width:340px;
+    /* BASE STYLES */
+    html, body { 
+        height: 100%; 
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
-    .panel h4 { margin:0 0 6px; font-size:14px }
-    .row { display:flex; align-items:center; gap:8px; margin-top:8px }
-    .panel button {
-      cursor:pointer; padding:6px 10px; border:1px solid #ccc;
-      border-radius:6px; background:#fff;
+    #map { 
+        width:100%; 
+        height:100%;
+        background: #f0f0f0;
     }
 
-    .right-panel {
-      position:absolute; top:12px; right:12px; z-index:9999;
-      background:rgba(255,255,255,0.96); border-radius:10px; padding:12px 14px;
-      width:220px; font:13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      box-shadow:0 2px 8px rgba(0,0,0,0.15);
-    }
-    .right-panel label { display:block; margin-bottom:6px }
-    .right-panel input[type="range"] { width:100% }
-
-    .logo {
-      position:absolute; bottom:12px; left:12px; z-index:9999;
-      background:rgba(255,255,255,0.9); border-radius:8px; padding:8px 12px;
-      font:600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      box-shadow:0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px;
-    }
-    .logo img { height:28px }
-
-    .back {
-      position:absolute; top:100px; right:12px; z-index:9999;
-    }
-    .back a {
-      background:#fff; border:1px solid #ccc; border-radius:8px;
-      padding:8px 10px; text-decoration:none; color:#111;
-      font:13px system-ui;
-    }
-
+    /* LOADER STYLE */
     #loader {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.8);
       color: white;
       z-index: 10000;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2em;
-      font-family: system-ui, sans-serif;
+      font-size: 1.5em;
+      font-weight: 500;
     }
 
-    @media (max-width: 600px) {
-      .right-panel {
-        top: auto;
-        right: 1.5rem;
-        bottom: 5rem;
-        width: 180px;
-        transform: translateX(0);
-      }
+    /* MODERN CONTROL PANEL */
+    .control-panel {
+      position: absolute; 
+      top: 15px; 
+      right: 15px; 
+      z-index: 999; 
+      background: rgba(255,255,255,0.98); 
+      border-radius: 12px; 
+      padding: 15px 20px;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+      max-width: 280px;
+      border: 1px solid rgba(0,0,0,0.1);
     }
-  </style>
+
+    .control-panel h4 { 
+        margin: 0 0 12px; 
+        font-size: 16px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .control-group {
+        margin-bottom: 15px;
+    }
+    
+    .control-group:last-child {
+        margin-bottom: 0;
+    }
+    
+    .control-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .control-row { 
+        display:flex; 
+        align-items:center; 
+        gap:10px; 
+        margin-top:8px; 
+    }
+    
+    .control-row input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+
+    .control-panel button {
+      cursor:pointer; 
+      padding: 8px 12px; 
+      border: 1px solid #ccc;
+      border-radius: 6px; 
+      background:#fff;
+      width: 100%;
+      margin-top: 10px;
+    }
+    .control-panel button:hover {
+        background: #f7f7f7;
+    }
+
+    /* MODERN SLIDER */
+    input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        background: #ddd;
+        border-radius: 5px;
+        outline: none;
+        opacity: 0.7;
+        transition: opacity .2s;
+    }
+    input[type="range"]:hover {
+        opacity: 1;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        background: #007bff;
+        cursor: pointer;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 4px rgba(0,0,0,0.2);
+    }
+    input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #007bff;
+        cursor: pointer;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 4px rgba(0,0,0,0.2);
+    }
+
+    /* LOGO & BACK BUTTON */
+    .logo {
+      position:absolute; bottom:15px; left:15px; z-index:999;
+      background:rgba(255,255,255,0.9); border-radius:8px; padding:8px 12px;
+      font:600 13px system-ui;
+      box-shadow:0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px;
+    }
+    .logo img { height:28px }
+    
+    .back-link {
+      position:absolute; 
+      top:15px; 
+      left: 80px; 
+      z-index: 1010; /* UPDATED: Raised from 999 to sit above Leaflet's controls */
+      background:#fff; 
+      border:1px solid #ccc; 
+      border-radius:8px;
+      padding:8px 10px; 
+      text-decoration:none; 
+      color:#111;
+      font:13px system-ui;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .popup-link {
+        display: block;
+        margin-top: 8px;
+        text-decoration: none;
+        color: #007bff;
+        font-weight: 500;
+    }
+    .popup-link:hover {
+        text-decoration: underline;
+    }
+
+    /* NEW: Locks the page from scrolling during mobile measurement */
+    body.measuring-active {
+      overflow: hidden;
+      position: fixed; /* Added for extra stability on iOS */
+      width: 100%;   /* Added for extra stability on iOS */
+    }
+
+   @media (max-width: 600px) {
+  .control-panel {
+    top: auto;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: none;
+    max-height: 45vh;
+    overflow-y: auto;  
+  }
+  .back-link {
+    top: 15px;
+    left: auto;   
+    right: 15px;  
+  }
+  .logo {
+    left: auto;
+    right: 15px;
+  }
+}
+
+</style>
 </head>
+
 <body>
   <div id="map"></div>
   <div id="loader">Loading Map...</div> 
 
-  <div class="panel">
-    <h4>How to use</h4>
-    <div>Scroll or pinch to zoom. Drag to pan. Toggle layers below. If you get lost, click Recenter.</div>
-    <div class="row"><input id="toggle-ortho" type="checkbox" checked><label for="toggle-ortho">Show orthomosaic</label></div>
-    <div class="row"><input id="toggle-basemap" type="checkbox" checked><label for="toggle-basemap">Show base map</label></div>
-    <div class="row"><button id="recenter">Recenter</button></div>
+  <div class="control-panel">
+  <h4>Map Controls</h4>
+
+  <details class="control-group">
+    <summary style="font-weight: 500; cursor: pointer; font-size: 15px;">Layer Controls</summary>
+    <div style="margin-top: 15px;">
+        <label for="opacity">Orthomosaic Opacity</label>
+        <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
+    </div>
+    <div style="margin-top: 15px;">
+        <label>Layer Visibility</label>
+        <div class="control-row"><input id="toggle-ortho" type="checkbox" checked><label for="toggle-ortho">Show Orthomosaic</label></div>
+        <div class="control-row"><input id="toggle-basemap" type="checkbox" checked><label for="toggle-basemap">Show Base Map</label></div>
+        <div class="control-row"><input id="toggle-suave-notes" type="checkbox" checked><label for="toggle-suave-notes">Show Suave Droning Analysis</label></div>
+        <div class="control-row"><input id="toggle-client-notes" type="checkbox" checked><label for="toggle-client-notes">Show Client Notes</label></div>
+    </div>
+  </details>
+
+  <div class="control-group">
+    <details>
+      <summary style="font-weight: 500; cursor: pointer; font-size: 15px;">Map Instructions</summary>
+      <p style="font-size: 13px; color: #555; margin-top: 8px; line-height: 1.5;">
+        <strong>Measurements:</strong> Use the tools in the top-left corner to measure distances and areas.<br><br>
+        <strong>Client Notes:</strong> To add a note, select the marker icon, click a location on the map, and fill out the form that appears.<br><br>
+        <span id="mobile-only-note"><strong>Note:</strong> The toolset on mobile is simplified for measurements. For full drawing and annotation features, please use a desktop browser.</span>
+      </p>
+    </details>
   </div>
+  
+  <details class="control-group">
+      <summary style="font-weight: 500; cursor: pointer; font-size: 15px;">Actions & Export</summary>
+      <div style="margin-top: 10px;">
+          <button id="recenter">Recenter Map</button>
+      </div>
+      <div style="margin-top: 15px;">
+        <label>Export Annotations</label>
+        <div style="display: flex; gap: 10px; margin-top: 8px;">
+          <button id="export-geojson" style="flex: 1;">As Map File</button>
+          <button id="export-csv" style="flex: 1;">As List (CSV)</button>
+        </div>
+      </div>
+  </details>
 
-  <div class="right-panel"><label for="opacity">Orthomosaic opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="1"></div>
-  <div class="back"><a href="../">← Back to portfolio</a></div>
-  <div class="logo"><img src="./assets/logo1.svg" alt="Suave Droning" /><span>Suave Droning • Orthomosaic</span></div>
+</div>
+  <a class="back-link" href="../">← Back to Portfolio</a>
+  <div class="logo"><img src="./assets/logo1.svg" alt="Suave Droning" /><span>Suave Droning</span></div>
 
+  <!-- JAVASCRIPT LIBRARIES -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.js"></script>
+
 
 <script>
   // Detect mobile to serve the appropriate file size
-const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-// Set up map options conditionally
-const mapOptions = {
-  zoomControl: true,
-  worldCopyJump: false,
-  preferCanvas: true,
+  if (!isMobile) {
+    const mobileNote = document.getElementById('mobile-only-note');
+    if (mobileNote) {
+      mobileNote.style.display = 'none';
+    }
+  }
 
-  // --- Conditional Settings ---
-  // Desktop gets smooth, snapping zoom. Mobile gets original settings.
-  zoomAnimation: !isMobile,
-  fadeAnimation: !isMobile,
-  zoomSnap: isMobile ? 0.30 : 1, 
-  wheelPxPerZoomLevel: isMobile ? 150 : 80 
-};
+  // Set up map options conditionally
+  const mapOptions = {
+    zoomControl: true,
+    worldCopyJump: false,
+    preferCanvas: true,
+    zoomAnimation: !isMobile,
+    fadeAnimation: !isMobile,
+    zoomSnap: isMobile ? 0.30 : 1, 
+    wheelPxPerZoomLevel: isMobile ? 150 : 80 
+  };
 
-// Initialize map with the chosen options
-const map = L.map('map', mapOptions);
+  // Initialize map with the chosen options
+  const map = L.map('map', mapOptions);
   
-  // Create map panes for layer control
+  // Create dedicated map panes for proper layer ordering
   map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
-  map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 400;
+  map.createPane('orthoPane');   map.getPane('orthoPane').style.zIndex = 300;
+  map.createPane('drawPane');    map.getPane('drawPane').style.zIndex = 650;
 
   // Add the base map layer
   const basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
@@ -129,30 +302,178 @@ const map = L.map('map', mapOptions);
     maxNativeZoom: 19, 
     maxZoom: 24, 
     crossOrigin: true,
-    updateWhenIdle: isMobile // <-- THIS MAKES THE CHANGE MOBILE-ONLY
+    updateWhenIdle: isMobile
   }).addTo(map);
 
   let ortho = null;
   let detectedBounds = null;
 
+  // --- ANNOTATION LAYERS ---
+  const suaveAnnotations = new L.FeatureGroup([], { pane: 'drawPane' }).addTo(map);
+  const clientAnnotations = new L.FeatureGroup([], { pane: 'drawPane' }).addTo(map);
+
+  // --- CONDITIONAL DRAWING/MEASUREMENT TOOLS ---
+  if (isMobile) {
+    // On mobile, use the simpler, more touch-friendly measurement tool
+    const measureControl = new L.Control.Measure({
+        position: 'topleft',
+        primaryLengthUnit: 'feet',
+        secondaryLengthUnit: 'miles',
+        primaryAreaUnit: 'sqfeet',
+        secondaryAreaUnit: 'acres',
+        activeColor: '#db4a29',
+        completedColor: '#9d351d'
+    });
+    measureControl.addTo(map);
+
+    map.on('measurestart', function() {
+      // When measurement starts, add the locking class to the body
+      document.body.classList.add('measuring-active');
+    });
+
+    map.on('measurefinish', function() {
+      // When measurement ends, remove the locking class
+      document.body.classList.remove('measuring-active');
+    });
+
+    
+  } else {
+    // On desktop, use the full-featured Leaflet.draw toolbar
+    const drawControl = new L.Control.Draw({
+        position: 'topleft',
+        edit: {
+            featureGroup: clientAnnotations, // Only allow editing of client's own notes
+            remove: true
+        },
+        draw: {
+            polygon: { allowIntersection: false, showArea: true, metric: false, feet: true },
+            polyline: { shapeOptions: { color: '#f357a1', weight: 4 }, metric: false, feet: true },
+            rectangle: { showArea: true, metric: false, feet: true },
+            circle: false,
+            marker: true,
+            circlemarker: false
+        }
+    });
+    map.addControl(drawControl);
+
+  }
+
+  // --- This is the updated code block ---
+  map.on(L.Draw.Event.CREATED, function (event) {
+      const layer = event.layer;
+      clientAnnotations.addLayer(layer);
+
+      // --- This function creates the form for adding/editing a note ---
+      function createNoteForm(currentNote = "") {
+          const formContainer = document.createElement('div');
+          formContainer.innerHTML = `
+              <strong style="font-size: 1.1em;">Add/Edit Note</strong>
+              <textarea style="width: 95%; height: 60px; margin-top: 8px; border: 1px solid #ccc; border-radius: 4px; padding: 5px; font-family: inherit;" placeholder="Type note for vendor, etc.">${currentNote}</textarea>
+              <div style="margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px;">
+                  <button class="cancel-note-btn" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">Cancel</button>
+                  <button class="save-note-btn" style="padding: 5px 10px; border: 0; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer;">Save Note</button>
+              </div>
+          `;
+
+          // --- Event Handlers for the form buttons ---
+          formContainer.querySelector('.save-note-btn').addEventListener('click', () => {
+              const noteText = formContainer.querySelector('textarea').value;
+              displaySavedNote(noteText); // Show the saved note
+          });
+
+          formContainer.querySelector('.cancel-note-btn').addEventListener('click', () => {
+              // If it was a brand new marker, cancel removes it.
+              // If it was an existing marker, it just closes the popup.
+              if (!currentNote) {
+                  clientAnnotations.removeLayer(layer);
+              } else {
+                  layer.closePopup();
+              }
+          });
+          
+          return formContainer;
+      }
+      
+      // --- This function displays the saved note with an Edit button ---
+      function displaySavedNote(noteText) {
+          const latlng = layer.getLatLng();
+          const lat = latlng.lat;
+          const lng = latlng.lng;
+          
+          const googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+          const appleMapsUrl = `http://maps.apple.com/?ll=${lat},${lng}`;
+          
+          const finalContent = document.createElement('div');
+          finalContent.innerHTML = `
+              <strong style="font-size: 1.1em;">Client Note:</strong>
+              <p class="saved-note" style="margin: 4px 0 12px; white-space: pre-wrap;">${noteText || '<em>No note provided.</em>'}</p>
+              <strong>Location:</strong><br>
+              Lat: ${lat.toFixed(6)}<br>
+              Lng: ${lng.toFixed(6)}
+              <a href="${googleMapsUrl}" target="_blank" class="popup-link">Open in Google Maps</a>
+              <a href="${appleMapsUrl}" target="_blank" class="popup-link">Open in Apple Maps</a>
+              <button class="edit-note-btn" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; margin-top: 10px; width: 100%;">Edit Note</button>
+          `;
+          
+          finalContent.querySelector('.edit-note-btn').addEventListener('click', () => {
+              const currentNote = finalContent.querySelector('.saved-note').textContent;
+              layer.setPopupContent(createNoteForm(currentNote));
+          });
+          
+          layer.setPopupContent(finalContent);
+      }
+
+      // --- Main Logic for different shapes ---
+      if (event.layerType === 'marker') {
+          layer.bindPopup(createNoteForm(), { minWidth: 250 }).openPopup();
+      } else if (event.layerType === 'polyline') {
+          // ... (rest of your polyline and polygon code is unchanged)
+          const latlngs = layer.getLatLngs();
+          let distance = 0;
+          for (let i = 0; i < latlngs.length - 1; i++) {
+              distance += latlngs[i].distanceTo(latlngs[i + 1]);
+          }
+          const distanceFt = distance * 3.28084;
+          const content = `<strong>Distance:</strong> ${distanceFt.toFixed(2)} ft`;
+          layer.bindPopup(content).openPopup();
+      } else if (event.layerType === 'polygon' || event.layerType === 'rectangle') {
+          const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+          const areaSqFt = area * 10.7639;
+          const areaAcres = areaSqFt / 43560;
+          const content = `<strong>Area:</strong> ${areaSqFt.toFixed(2)} sq ft<br>(${areaAcres.toFixed(4)} acres)`;
+          layer.bindPopup(content).openPopup();
+      }
+  });
+
+  
+
+  // --- DATA LOADING ---
+  async function loadSuaveAnnotations() {
+      // This is where you would load your pre-made annotations.
+      // For now, it's a placeholder.
+      // Example:
+      // const response = await fetch('path/to/your/analysis.geojson');
+      // const data = await response.json();
+      // L.geoJSON(data).eachLayer(layer => suaveAnnotations.addLayer(layer));
+      
+      // Placeholder example marker:
+      // const exampleMarker = L.marker([40.198150, -76.929075]).bindPopup("<strong>Suave Droning Analysis:</strong><br>This is an example note from Suave Droning.");
+      // suaveAnnotations.addLayer(exampleMarker);
+  }
+
  async function init() {
-  // Use the appropriate file size for the device
   const pmtilesUrl = isMobile
       ? "https://tiles.suavedroning.com/church-thermal-lite.pmtiles"
       : "https://tiles.suavedroning.com/camp-hill-church.pmtiles";
 
-  // Initialize the PMTiles source
   const p = new pmtiles.PMTiles(pmtilesUrl);
   
-  // Asynchronously get metadata from the PMTiles file
   const header = await p.getHeader().catch(() => null);
   const meta   = await p.getMetadata().catch(() => null);
   
-  // We will still read these values for the layer, but not trust minZoom for the map itself.
   const minNative = Number.isFinite(header?.minZoom) ? header.minZoom : 0;
   const maxNative = Number.isFinite(header?.maxZoom) ? header.maxZoom : 22;
   
-  // Set max zoom to prevent pixelation.
   let maxAllowedZoom;
   if (isMobile) {
     maxAllowedZoom = Math.min(maxNative + 1, 21);
@@ -160,7 +481,6 @@ const map = L.map('map', mapOptions);
     maxAllowedZoom = maxNative;
   }
 
-  // Smartly find the geographic bounds from metadata or header
   let b = null;
   if (meta?.bounds) {
     b = Array.isArray(meta.bounds) ? meta.bounds.map(Number) : String(meta.bounds).split(',').map(Number);
@@ -168,7 +488,6 @@ const map = L.map('map', mapOptions);
     b = [header.minLon, header.minLat, header.maxLon, header.maxLat];
   }
 
-  // Create the orthomosaic layer and add it to the map
   ortho = pmtiles.leafletRasterLayer(p, { 
     pane: 'orthoPane', 
     noWrap: true, 
@@ -178,76 +497,143 @@ const map = L.map('map', mapOptions);
     updateWhenIdle: isMobile
   }).addTo(map);
 
-  // Fit map to the data's bounds if found, otherwise use a fallback
   if (b?.length === 4 && b.every(Number.isFinite)) {
     const [w,s,e,n] = b;
     detectedBounds = L.latLngBounds([s,w],[n,e]);
     map.fitBounds(detectedBounds, { padding: [10,10] });
     
-    // Calculate minZoom automatically.
-    let autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
-    
-    // ====================================================================
-    // == THIS IS THE CRITICAL FIX THAT WAS MISSING                      ==
-    // == It enforces a safe minimum zoom "floor" on mobile devices.   ==
     if (isMobile) {
-      autoMin = Math.max(autoMin, 13); 
+      map.setMinZoom(Math.max(0, minNative - 2));
+    } else {
+      const autoMin = Math.max(0, map.getBoundsZoom(detectedBounds, true) - 2);
+      map.setMinZoom(autoMin);
     }
-    // ====================================================================
     
-    map.setMinZoom(autoMin);
     map.setMaxZoom(maxAllowedZoom);
 
   } else {
-    // Fallback view
-    map.setView([40.24, -76.92], 18); // Adjusted for Camp Hill
-    // USE A SAFE FALLBACK: This prevents the crash if metadata fails to load.
-    map.setMinZoom(13); 
+    map.setView([40.24, -76.92], 18);
+    map.setMinZoom(14); 
     map.setMaxZoom(maxAllowedZoom);
   }
 
-  // Set a background color for the map container
-  document.querySelector('.leaflet-container').style.background = '#f7f7f7';
-  
-  // Hide the loading screen now that everything is ready
+  loadSuaveAnnotations(); // Load your pre-made notes
   document.getElementById('loader').style.display = 'none';
 }
 
-  // Start the map initialization process
   init();
 
-  // --- UI Event Handlers ---
+  // --- UI EVENT HANDLERS ---
   document.getElementById('toggle-ortho').addEventListener('change', e => { 
     if (!ortho) return; 
-    if (e.target.checked) { 
-      map.addLayer(ortho); 
-      ortho.bringToFront(); 
-    } else { 
-      map.removeLayer(ortho); 
-    } 
+    if (e.target.checked) map.addLayer(ortho); else map.removeLayer(ortho); 
   });
   
   document.getElementById('toggle-basemap').addEventListener('change', e => { 
-    if (e.target.checked) { 
-      map.addLayer(basemap); 
-    } else { 
-      map.removeLayer(basemap); 
-    } 
+    if (e.target.checked) map.addLayer(basemap); else map.removeLayer(basemap); 
+  });
+  
+  document.getElementById('toggle-suave-notes').addEventListener('change', e => { 
+    if (e.target.checked) map.addLayer(suaveAnnotations); else map.removeLayer(suaveAnnotations); 
+  });
+
+  document.getElementById('toggle-client-notes').addEventListener('change', e => { 
+    if (e.target.checked) map.addLayer(clientAnnotations); else map.removeLayer(clientAnnotations); 
   });
   
   document.getElementById('recenter').addEventListener('click', () => { 
-    if (detectedBounds) {
-      map.fitBounds(detectedBounds, { padding:[10,10] }); 
-    }
+    if (detectedBounds) map.fitBounds(detectedBounds, { padding:[10,10] }); 
   });
   
   document.getElementById('opacity').addEventListener('input', e => { 
-    if (ortho) {
-      ortho.setOpacity(parseFloat(e.target.value)); 
+    if (ortho) ortho.setOpacity(parseFloat(e.target.value)); 
+  });
+
+  // --- NEW: EXPORT FUNCTIONALITY ---
+
+  // Helper function to trigger a file download in the browser
+  function downloadFile(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  }
+
+  // --- Export as GeoJSON (Map Data File) ---
+  document.getElementById('export-geojson').addEventListener('click', () => {
+    if (clientAnnotations.getLayers().length === 0) {
+        alert("There are no client annotations to export.");
+        return;
     }
+    const geojsonData = clientAnnotations.toGeoJSON();
+    const dataString = JSON.stringify(geojsonData, null, 2); // Pretty print the JSON
+    downloadFile('suave-droning-annotations.geojson', dataString, 'application/json');
   });
 
 
+  // --- Export as CSV (Static List with Lat/Long) ---
+  document.getElementById('export-csv').addEventListener('click', () => {
+    const layers = clientAnnotations.getLayers();
+    if (layers.length === 0) {
+        alert("There are no client annotations to export.");
+        return;
+    }
+
+    let csvContent = 'Type,Note,Latitude,Longitude,Details\n'; // CSV Header
+
+    layers.forEach(layer => {
+        let type = 'Shape';
+        let note = 'N/A';
+        let lat = 'N/A';
+        let lng = 'N/A';
+        let details = 'N/A';
+
+        if (layer instanceof L.Marker) {
+            type = 'Note / Marker';
+            const latlng = layer.getLatLng();
+            lat = latlng.lat.toFixed(6);
+            lng = latlng.lng.toFixed(6);
+
+            // Extract the note from the popup's HTML content
+            const popupContent = layer.getPopup()?.getContent() || '';
+            if (typeof popupContent === 'string' && popupContent.includes('<p>')) {
+              note = popupContent.split('<p style="margin: 4px 0 12px; white-space: pre-wrap;">')[1]
+                                 .split('</p>')[0]
+                                 .replace(/<em>(.*?)<\/em>/g, ''); // Remove em tags
+            }
+        } else if (layer instanceof L.Polygon) {
+            type = 'Area / Polygon';
+            const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+            const areaSqFt = (area * 10.7639).toFixed(2);
+            details = `${areaSqFt} sq ft`;
+            const center = layer.getBounds().getCenter();
+            lat = center.lat.toFixed(6);
+            lng = center.lng.toFixed(6);
+        } else if (layer instanceof L.Polyline) {
+            type = 'Measurement / Line';
+            const latlngs = layer.getLatLngs();
+            let distance = 0;
+            for (let i = 0; i < latlngs.length - 1; i++) {
+                distance += latlngs[i].distanceTo(latlngs[i + 1]);
+            }
+            const distanceFt = (distance * 3.28084).toFixed(2);
+            details = `${distanceFt} ft`;
+            const center = layer.getBounds().getCenter();
+            lat = center.lat.toFixed(6);
+            lng = center.lng.toFixed(6);
+        }
+        
+        // Add a new row to the CSV string
+        csvContent += `"${type}","${note}","${lat}","${lng}","${details}"\n`;
+    });
+
+    downloadFile('suave-droning-report.csv', csvContent, 'text/csv;charset=utf-8;');
+  });
+  
 </script>
 
 </body>

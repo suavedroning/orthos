@@ -149,10 +149,16 @@
     .logo img { height:28px }
     
     .back-link {
-      position:absolute; top:15px; left: 80px; 
-      z-index:999;
-      background:#fff; border:1px solid #ccc; border-radius:8px;
-      padding:8px 10px; text-decoration:none; color:#111;
+      position:absolute; 
+      top:15px; 
+      left: 80px; 
+      z-index: 1010; /* UPDATED: Raised from 999 to sit above Leaflet's controls */
+      background:#fff; 
+      border:1px solid #ccc; 
+      border-radius:8px;
+      padding:8px 10px; 
+      text-decoration:none; 
+      color:#111;
       font:13px system-ui;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
@@ -168,63 +174,85 @@
         text-decoration: underline;
     }
 
-    /* RESPONSIVE DESIGN */
-    @media (max-width: 600px) {
-      .control-panel {
-        top: auto;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        max-width: none;
-      }
-      .back-link {
-          top: 15px;
-          left: 15px;
-      }
+    /* NEW: Locks the page from scrolling during mobile measurement */
+    body.measuring-active {
+      overflow: hidden;
+      position: fixed; /* Added for extra stability on iOS */
+      width: 100%;   /* Added for extra stability on iOS */
     }
-  </style>
+
+   @media (max-width: 600px) {
+  .control-panel {
+    top: auto;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: none;
+    max-height: 45vh;
+    overflow-y: auto;  
+  }
+  .back-link {
+    top: 15px;
+    left: auto;   
+    right: 15px;  
+  }
+  .logo {
+    left: auto;
+    right: 15px;
+  }
+}
+
+</style>
 </head>
+
 <body>
   <div id="map"></div>
   <div id="loader">Loading Map...</div> 
 
   <div class="control-panel">
-    <h4>Map Controls</h4>
-    <div class="control-group">
+  <h4>Map Controls</h4>
+
+  <details class="control-group">
+    <summary style="font-weight: 500; cursor: pointer; font-size: 15px;">Layer Controls</summary>
+    <div style="margin-top: 15px;">
         <label for="opacity">Orthomosaic Opacity</label>
         <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
     </div>
-    <div class="control-group">
+    <div style="margin-top: 15px;">
         <label>Layer Visibility</label>
         <div class="control-row"><input id="toggle-ortho" type="checkbox" checked><label for="toggle-ortho">Show Orthomosaic</label></div>
         <div class="control-row"><input id="toggle-basemap" type="checkbox" checked><label for="toggle-basemap">Show Base Map</label></div>
-        <!-- NEW: Checkboxes for annotation layers -->
         <div class="control-row"><input id="toggle-suave-notes" type="checkbox" checked><label for="toggle-suave-notes">Show Suave Droning Analysis</label></div>
         <div class="control-row"><input id="toggle-client-notes" type="checkbox" checked><label for="toggle-client-notes">Show Client Notes</label></div>
     </div>
-    
-    <div class="control-group">
-      <details>
-        <summary style="cursor: pointer; font-weight: 500;">Map Instructions</summary>
-        <p style="font-size: 13px; color: #555; margin-top: 8px; line-height: 1.5;">
-          <strong>Measurements:</strong> Use the tools in the top-left corner to measure distances and areas.<br><br>
-          <strong>Client Notes:</strong> To add a note, select the marker icon, click a location on the map, and fill out the form that appears.
-        </p>
-      </details>
-    </div>
-    <div class="control-group">
-        <button id="recenter">Recenter Map</button>
-    </div>
-  
-  <div class="control-group">
-      <label>Export Annotations</label>
-      <div style="display: flex; gap: 10px; margin-top: 8px;">
-        <button id="export-geojson" style="flex: 1;">As Map File</button>
-        <button id="export-csv" style="flex: 1;">As List (CSV)</button>
-      </div>
-  </div>
-  </div>
+  </details>
 
+  <div class="control-group">
+    <details>
+      <summary style="font-weight: 500; cursor: pointer; font-size: 15px;">Map Instructions</summary>
+      <p style="font-size: 13px; color: #555; margin-top: 8px; line-height: 1.5;">
+        <strong>Measurements:</strong> Use the tools in the top-left corner to measure distances and areas.<br><br>
+        <strong>Client Notes:</strong> To add a note, select the marker icon, click a location on the map, and fill out the form that appears.<br><br>
+        <span id="mobile-only-note"><strong>Note:</strong> The toolset on mobile is simplified for measurements. For full drawing and annotation features, please use a desktop browser.</span>
+      </p>
+    </details>
+  </div>
+  
+  <details class="control-group">
+      <summary style="font-weight: 500; cursor: pointer; font-size: 15px;">Actions & Export</summary>
+      <div style="margin-top: 10px;">
+          <button id="recenter">Recenter Map</button>
+      </div>
+      <div style="margin-top: 15px;">
+        <label>Export Annotations</label>
+        <div style="display: flex; gap: 10px; margin-top: 8px;">
+          <button id="export-geojson" style="flex: 1;">As Map File</button>
+          <button id="export-csv" style="flex: 1;">As List (CSV)</button>
+        </div>
+      </div>
+  </details>
+
+</div>
   <a class="back-link" href="../">← Back to Portfolio</a>
   <div class="logo"><img src="./assets/logo1.svg" alt="Suave Droning" /><span>Suave Droning</span></div>
 
@@ -238,6 +266,13 @@
 <script>
   // Detect mobile to serve the appropriate file size
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+  if (!isMobile) {
+    const mobileNote = document.getElementById('mobile-only-note');
+    if (mobileNote) {
+      mobileNote.style.display = 'none';
+    }
+  }
 
   // Set up map options conditionally
   const mapOptions = {
@@ -290,6 +325,18 @@
         completedColor: '#9d351d'
     });
     measureControl.addTo(map);
+
+    map.on('measurestart', function() {
+      // When measurement starts, add the locking class to the body
+      document.body.classList.add('measuring-active');
+    });
+
+    map.on('measurefinish', function() {
+      // When measurement ends, remove the locking class
+      document.body.classList.remove('measuring-active');
+    });
+
+    
   } else {
     // On desktop, use the full-featured Leaflet.draw toolbar
     const drawControl = new L.Control.Draw({
